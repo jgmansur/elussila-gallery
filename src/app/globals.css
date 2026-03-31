@@ -1,26 +1,119 @@
-@import "tailwindcss";
-
+/* src/app/globals.css */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-color: #F8F5F2; /* Warm sophisticated off-white perfect for modern gallery */
+  --text-color: #1A1A1A; /* Almost black for maximum contrast without harshness */
+  --muted-text: #666666; /* For secondary information */
+  
+  --spacing-base: 8px;
+  
+  /* Accessible font sizes (larger baseline for readability) */
+  --text-base: 20px; 
+  --text-md: 24px;
+  --text-lg: 32px;
+  --text-xl: 48px;
+  --text-xxl: 64px;
+
+  --border-radius-base: 12px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Accessibility for 69y/o */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: var(--font-inter), sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-playfair), serif;
+  font-weight: 500;
+  line-height: 1.2;
+  margin-bottom: calc(var(--spacing-base) * 2);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-inter), sans-serif;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* Base structural layout */
+.layout-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-header {
+  padding: calc(var(--spacing-base) * 4) calc(var(--spacing-base) * 3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid rgba(0,0,0,0.05);
+}
+
+.gallery-logo {
+  font-family: var(--font-playfair), serif;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+
+.main-navigation {
+  display: flex;
+  gap: calc(var(--spacing-base) * 3);
+  font-size: var(--text-base);
+  align-items: center;
+}
+
+.admin-link {
+  text-decoration: underline;
+  color: var(--muted-text);
+}
+
+.main-content {
+  flex: 1;
+  padding: calc(var(--spacing-base) * 4) calc(var(--spacing-base) * 3);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Large Accessible Buttons */
+.btn-primary {
+  background-color: var(--text-color);
+  color: var(--bg-color);
+  padding: calc(var(--spacing-base) * 2.5) calc(var(--spacing-base) * 4);
+  font-size: var(--text-md);
+  border-radius: var(--border-radius-base);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, opacity 0.2s;
+  width: 100%; /* Mobile friendly */
+}
+
+@media (min-width: 768px) {
+  .btn-primary {
+    width: auto;
+  }
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
 }
