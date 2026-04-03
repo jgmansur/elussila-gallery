@@ -167,7 +167,6 @@ a {
   position: fixed;
   top: var(--space-sm); /* tighter for mobile */
   left: 50%;
-  transform: translateX(-50%);
   width: calc(100% - var(--space-md)); 
   max-width: 1200px;
   z-index: 1000;
