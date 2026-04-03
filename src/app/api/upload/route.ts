@@ -23,11 +23,16 @@ export async function POST(request: Request) {
 
     // Subir cada foto a Drive
     for (const fileItem of files) {
-      const theFile = fileItem as File;
-      const buffer = Buffer.from(await theFile.arrayBuffer());
+      if (!(fileItem instanceof File)) continue;
       
-      const { id, url } = await uploadToDrive(auth, theFile.name, theFile.type, buffer);
-      uploadedImages.push({ id, url });
+      const buffer = Buffer.from(await fileItem.arrayBuffer());
+      const fileName = fileItem.name || 'untitled_image';
+      const fileType = fileItem.type || 'image/jpeg';
+      
+      const { id, url } = await uploadToDrive(auth, fileName, fileType, buffer);
+      if (id && url) {
+        uploadedImages.push({ id, url });
+      }
     }
     
     const newEntry = {
@@ -39,8 +44,8 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString()
     };
     
-    // Guardar en nuestra BD local en lo que la UI está lista y la pasamos a Sheets
-    addArtwork(newEntry);
+    // Guardar en nuestra BD en Google Sheets
+    await addArtwork(newEntry);
 
     return NextResponse.json({ success: true, artworkId: newEntry.id });
 

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     }
 
     const auth = await getGoogleAuth();
-    const artworks = getArtworks();
+    const artworks = await getArtworks();
     const targetArtwork = artworks.find(a => a.id === artworkId);
 
     if (!targetArtwork) {
@@ -26,9 +26,9 @@ export async function POST(request: Request) {
       // Borrar de drive
       await deleteFromDrive(auth, imgToDelete.id);
       
-      // Actualizar DB Local array
+      // Actualizar DB en Sheets
       const remainingImgs = targetArtwork.images.filter(img => img.id !== imageId);
-      updateArtworkImages(artworkId, remainingImgs);
+      await updateArtworkImages(artworkId, remainingImgs);
 
       return NextResponse.json({ success: true, message: "Foto individual eliminada con éxito" });
     }
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     }
     
     // Quitar de la BD
-    deleteArtworkById(artworkId);
+    await deleteArtworkById(artworkId);
 
     return NextResponse.json({ success: true, message: "Obra y archivos de Drive eliminados" });
 
