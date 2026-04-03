@@ -133,29 +133,37 @@ export default function Gallery() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeModal}
+            className="glass"
             style={{
-              position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-              backgroundColor: 'rgba(255, 255, 255, 0.95)', zIndex: 2000,
-              display: 'flex', flexDirection: 'column', padding: 'var(--space-md)', cursor: 'zoom-out',
-              backdropFilter: 'blur(10px)'
+              position: 'fixed', top: 0, left: 0, width: '100vw', height: '100dvh',
+              backgroundColor: 'rgba(255, 255, 255, 0.98)', zIndex: 2000,
+              display: 'flex', flexDirection: 'column', padding: 'var(--space-md)', 
+              paddingTop: 'var(--space-xxl)', cursor: 'zoom-out',
+              overflowY: 'auto'
             }}
           >
             {/* Close UI */}
             <motion.button 
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={closeModal}
-              style={{ position: 'absolute', top: '32px', right: '32px', fontSize: '32px', zIndex: 2100 }}
+               whileHover={{ scale: 1.1 }}
+               whileTap={{ scale: 0.9 }}
+               onClick={closeModal}
+               style={{ 
+                 position: 'fixed', top: '16px', right: '16px', 
+                 width: '48px', height: '48px', borderRadius: '50%',
+                 backgroundColor: 'rgba(0,0,0,0.05)', color: 'var(--text-primary)',
+                 display: 'flex', justifyContent: 'center', alignItems: 'center',
+                 fontSize: '24px', zIndex: 2100 
+               }}
             >
               ×
             </motion.button>
 
             <div 
               onClick={(e) => e.stopPropagation()} 
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'default' }}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center', cursor: 'default', minHeight: 'min-content' }}
             >
               {/* Main Image Container */}
-              <div style={{ position: 'relative', width: '100%', maxWidth: '1000px', height: '70vh', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ position: 'relative', width: '100%', maxWidth: '1000px', height: '60vh', minHeight: '300px', display: 'flex', justifyContent: 'center' }}>
                 <AnimatePresence mode="wait">
                   <motion.img 
                     key={currentImageIndex}
@@ -164,20 +172,21 @@ export default function Gallery() {
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: -20, opacity: 0 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)' }}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }}
                     onClick={() => selectedArtwork.images.length > 1 && nextImage()}
+                    draggable={false}
                   />
                 </AnimatePresence>
 
                 {selectedArtwork.images.length > 1 && (
-                  <div style={{ position: 'absolute', bottom: '-48px', display: 'flex', gap: '12px' }}>
-                    <button onClick={prevImage} style={{ fontSize: '1.5rem', opacity: 0.5 }}>←</button>
+                  <div style={{ position: 'absolute', bottom: '-48px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <button onClick={prevImage} style={{ fontSize: '1.5rem', opacity: 0.7, padding: '8px' }}>←</button>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       {selectedArtwork.images.map((_, i) => (
                         <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i === currentImageIndex ? 'var(--text-primary)' : 'var(--border)' }} />
                       ))}
                     </div>
-                    <button onClick={nextImage} style={{ fontSize: '1.5rem', opacity: 0.5 }}>→</button>
+                    <button onClick={nextImage} style={{ fontSize: '1.5rem', opacity: 0.7, padding: '8px' }}>→</button>
                   </div>
                 )}
               </div>
@@ -187,7 +196,7 @@ export default function Gallery() {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                style={{ marginTop: 'var(--space-xl)', textAlign: 'center', maxWidth: '600px' }}
+                style={{ marginTop: 'var(--space-xxl)', marginBottom: 'var(--space-xl)', textAlign: 'center', maxWidth: '600px', paddingInline: 'var(--space-md)' }}
               >
                 <h2 style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-serif)' }}>{selectedArtwork.title}</h2>
                 <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>{selectedArtwork.details}</p>
