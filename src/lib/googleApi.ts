@@ -6,19 +6,30 @@ const SCOPES = [
 ];
 
 export async function getGoogleAuth() {
-  const credentials = process.env.GOOGLE_CREDENTIALS ? JSON.parse(process.env.GOOGLE_CREDENTIALS) : null;
-  
-  if (!credentials) {
-    console.warn("GOOGLE_CREDENTIALS NO ESTÁN CONFIGURADAS. Modo desarrollo activado.");
+  try {
+    const rawCredentials = process.env.GOOGLE_CREDENTIALS;
+    if (!rawCredentials) {
+      console.warn("GOOGLE_CREDENTIALS NO ESTÁN CONFIGURADAS.");
+      return null;
+    }
+
+    const credentials = JSON.parse(rawCredentials);
+    
+    // Vercel fix: Ensure private_key newlines are handled correctly
+    if (credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
+    const auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: SCOPES,
+    });
+
+    return auth;
+  } catch (error: any) {
+    console.error("Error al parsear GOOGLE_CREDENTIALS:", error.message);
     return null;
   }
-
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: SCOPES,
-  });
-
-  return auth;
 }
 
 export async function uploadToDrive(auth: any, fileName: string, mimeType: string, fileStream: any) {
