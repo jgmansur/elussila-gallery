@@ -71,10 +71,9 @@ export async function getArtworks(): Promise<Artwork[]> {
 
 export async function addArtwork(artwork: Artwork) {
   const auth = await getGoogleAuth();
-  if (!auth) throw new Error("Accion cancelada: Error de autenticacion con Google.");
-  if (!SPREADSHEET_ID) throw new Error("Error: GOOGLE_SHEET_ID no configurada.");
+  if (!SPREADSHEET_ID) throw new Error("Error: GOOGLE_SHEET_ID no configurada en Vercel.");
 
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = google.sheets({ version: 'v4', auth: auth as any });
   
   try {
     const values = [

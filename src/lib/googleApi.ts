@@ -6,30 +6,31 @@ const SCOPES = [
 ];
 
 export async function getGoogleAuth() {
-  try {
-    const rawCredentials = process.env.GOOGLE_CREDENTIALS;
-    if (!rawCredentials) {
-      console.warn("GOOGLE_CREDENTIALS NO ESTÁN CONFIGURADAS.");
-      return null;
-    }
-
-    const credentials = JSON.parse(rawCredentials);
-    
-    // Vercel fix: Ensure private_key newlines are handled correctly
-    if (credentials.private_key) {
-      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-    }
-
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: SCOPES,
-    });
-
-    return auth;
-  } catch (error: any) {
-    console.error("Error al parsear GOOGLE_CREDENTIALS:", error.message);
-    return null;
+  const rawCredentials = process.env.GOOGLE_CREDENTIALS;
+  if (!rawCredentials) {
+    throw new Error("ERROR CRÍTICO: La variable GOOGLE_CREDENTIALS no está configurada en el servidor (Vercel).");
   }
+
+  let credentials;
+  try {
+    credentials = JSON.parse(rawCredentials);
+  } catch (parseError: any) {
+    throw new Error(`ERROR DE SINTAXIS JSON: Las credenciales en Vercel tienen un formato inválido. Asegúrate de que no tengan comillas extra al principio. Detalle: ${parseError.message}`);
+  }
+  
+  if (!credentials.private_key) {
+    throw new Error("ERROR DE CREDENCIALES: El JSON de Google no contiene la 'private_key'.");
+  }
+
+  // Vercel fix: Ensure private_key newlines are handled correctly
+  credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: SCOPES,
+  });
+
+  return auth;
 }
 
 export async function uploadToDrive(auth: any, fileName: string, mimeType: string, fileStream: any) {
