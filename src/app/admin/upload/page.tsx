@@ -50,14 +50,16 @@ export default function UploadPage() {
         body: formData,
       });
 
+      const data = await response.json();
+
       if (response.ok) {
         setMessage("✅ ¡Obra publicada con éxito! Redirigiendo...");
         setTimeout(() => router.push('/admin/inventory'), 1500);
       } else {
-        setMessage("❌ Hubo un error al intentar publicar.");
+        setMessage(`❌ Error: ${data.error || "No se pudo publicar."}`);
       }
-    } catch (error) {
-      setMessage("❌ Falla de red. Intenta de nuevo.");
+    } catch (error: any) {
+      setMessage(`❌ Falla: ${error.message || "Error de red."}`);
     } finally {
       setLoading(false);
     }
