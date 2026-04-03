@@ -20,6 +20,22 @@ export default function AdminDashboard() {
           Subir Nueva Obra
         </Link>
         
+        <Link href="/admin/inventory" style={{ 
+          backgroundColor: '#ffebeb', color: '#cc0000', 
+          padding: '32px 24px', borderRadius: '16px', fontSize: 'var(--text-md)',
+          fontWeight: 600, textAlign: 'center', display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center'
+        }}>
+          <span>🗑️</span> Administrar Inventario y Drive
+        </Link>
+        
+        <Link href="/admin/about" style={{ 
+          backgroundColor: '#D1CAC2', color: 'var(--text-color)', 
+          padding: '32px 24px', borderRadius: '16px', fontSize: 'var(--text-md)',
+          fontWeight: 600, textAlign: 'center', display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center'
+        }}>
+          <span>✍️</span> Editar Mi Biografía
+        </Link>
+        
         <Link href="/gallery" style={{ 
           backgroundColor: '#EAE5E0', color: 'var(--text-color)', 
           padding: '32px 24px', borderRadius: '16px', fontSize: 'var(--text-md)',

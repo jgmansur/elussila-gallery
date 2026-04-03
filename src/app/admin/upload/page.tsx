@@ -2,8 +2,8 @@
 import { useState, useRef } from 'react';
 
 export default function UploadArtwork() {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [details, setDetails] = useState('');
@@ -18,22 +18,31 @@ export default function UploadArtwork() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
+      const selectedFiles = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...selectedFiles]);
+      
+      const newPreviews = selectedFiles.map(file => URL.createObjectURL(file));
+      setPreviews(prev => [...prev, ...newPreviews]);
     }
+  };
+
+  const removeImagePreview = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !title) {
-      alert("Por favor, selecciona una fotografía y escribe el título.");
+    if (files.length === 0 || !title) {
+      alert("Por favor, selecciona al menos una fotografía y escribe el título.");
       return;
     }
     
     setStatus('loading');
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(file => {
+      formData.append('file', file);
+    });
     formData.append('title', title);
     formData.append('price', price);
     formData.append('details', details);
@@ -46,13 +55,11 @@ export default function UploadArtwork() {
       const data = await resp.json();
       if (resp.ok && data.success) {
         setStatus('success');
-        // Clear form
-        setFile(null);
-        setPreview(null);
+        setFiles([]);
+        setPreviews([]);
         setTitle('');
         setPrice('');
         setDetails('');
-        // Show success alert
         alert("¡Tu obra se subió exitosamente a la galería y al sistema!");
       } else {
         setStatus('error');
@@ -70,45 +77,56 @@ export default function UploadArtwork() {
     <main className="main-content" style={{ maxWidth: '800px', margin: '0 auto', gap: '32px', display: 'flex', flexDirection: 'column' }}>
       <header style={{ marginBottom: '16px' }}>
         <h1 style={{ fontSize: 'var(--text-xl)', marginBottom: '8px' }}>Nueva Obra</h1>
-        <p style={{ color: 'var(--muted-text)', fontSize: 'var(--text-md)' }}>Sube una foto directamente desde la cámara de tu celular.</p>
+        <p style={{ color: 'var(--muted-text)', fontSize: 'var(--text-md)' }}>Puedes subir o tomar varias fotos para esta misma obra.</p>
       </header>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
         
-        {/* BIG PHOTO BUTTON / PREVIEW */}
+        {/* MULTI-PHOTO UPLOAD SECTION */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <label style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>1. Fotografía</label>
+          <label style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>1. Fotografías</label>
           <input 
             type="file" 
             accept="image/*"
+            multiple
             ref={fileInputRef} 
             onChange={handleFileChange} 
             style={{ display: 'none' }} 
-            capture="environment" // Hint to use back camera on mobile
+            capture="environment"
           />
+          
           <button type="button" onClick={handleImageClick} style={{ 
-            backgroundColor: preview ? '#000' : '#EAE5E0', 
-            height: '240px', 
+            backgroundColor: '#EAE5E0', 
+            height: '240px',
             borderRadius: '16px', 
             border: '2px dashed #B0A8A0', 
             display: 'flex', flexDirection: 'column', 
             justifyContent: 'center', alignItems: 'center', cursor: 'pointer', gap: '16px',
-            backgroundImage: preview ? `url(${preview})` : 'none',
-            backgroundSize: 'contain',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            position: 'relative'
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-            {!preview && (
-              <>
-                <span style={{ fontSize: '64px' }}>📷</span>
-                <span style={{ fontSize: 'var(--text-lg)', fontWeight: 500, color: '#666' }}>Tocar para Tomar Foto</span>
-              </>
-            )}
-            {preview && (
-              <div style={{ position: 'absolute', bottom: 16, backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px 16px', borderRadius: '8px', fontSize: '18px' }}>Cambiar Foto</div>
-            )}
+             <span style={{ fontSize: '64px' }}>📷</span>
+             <span style={{ fontSize: 'var(--text-lg)', fontWeight: 500, color: '#666' }}>Tocar para Añadir Foto(s)</span>
           </button>
+          
+          {/* Photos Grid Preview */}
+          {previews.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '16px', marginTop: '16px' }}>
+              {previews.map((previewSrc, index) => (
+                <div key={index} style={{ position: 'relative', aspectRatio: '1', borderRadius: '12px', overflow: 'hidden', border: '1px solid #ccc' }}>
+                  <img src={previewSrc} alt={`Preview ${index}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button 
+                    type="button" 
+                    onClick={() => removeImagePreview(index)} 
+                    style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    X
+                  </button>
+                  {index === 0 && <span style={{ position: 'absolute', bottom: 4, left: 4, backgroundColor: '#1A1A1A', color: 'white', fontSize: '12px', padding: '4px 8px', borderRadius: '8px' }}>Portada</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* DETAILS */}
@@ -136,8 +154,8 @@ export default function UploadArtwork() {
           }} />
         </div>
 
-        <button type="submit" disabled={status === 'loading'} className="btn-primary" style={{ marginTop: '24px', padding: '32px', fontSize: 'var(--text-lg)', opacity: status === 'loading' ? 0.7 : 1 }}>
-          {status === 'loading' ? 'Publicando...' : 'Publicar Obra en mi Galería'}
+        <button type="submit" disabled={status === 'loading' || files.length === 0} className="btn-primary" style={{ marginTop: '24px', padding: '32px', fontSize: 'var(--text-lg)', opacity: status === 'loading' ? 0.7 : 1 }}>
+          {status === 'loading' ? `Subiendo ${files.length} fotos...` : 'Publicar Obra en mi Galería'}
         </button>
 
       </form>

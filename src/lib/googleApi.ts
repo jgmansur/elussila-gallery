@@ -22,13 +22,13 @@ export async function getGoogleAuth() {
 }
 
 export async function uploadToDrive(auth: any, fileName: string, mimeType: string, fileStream: any) {
-  if (!auth) return "MOCK_DRIVE_URL_12345";
+  if (!auth) return { id: "mock_id_123", url: "MOCK_DRIVE_URL_12345" };
 
   const drive = google.drive({ version: 'v3', auth });
    
   const fileMetadata = {
     name: fileName,
-    parents: [process.env.GOOGLE_DRIVE_FOLDER_ID || ''],
+    parents: ['1BrBgwCSercYBcRJBuEsm27Q_OgjVX_Yu'], // Hardcoded Folder ID provided by user
   };
   
   const media = {
@@ -42,7 +42,21 @@ export async function uploadToDrive(auth: any, fileName: string, mimeType: strin
     fields: 'id, webViewLink',
   });
 
-  return response.data.webViewLink;
+  return { 
+    id: response.data.id, 
+    url: response.data.webViewLink 
+  };
+}
+
+export async function deleteFromDrive(auth: any, fileId: string) {
+  if (!auth) {
+    console.log("MOCK: Deleted file", fileId);
+    return true;
+  }
+  
+  const drive = google.drive({ version: 'v3', auth });
+  await drive.files.delete({ fileId });
+  return true;
 }
 
 export async function appendToSheet(auth: any, rowData: any[]) {

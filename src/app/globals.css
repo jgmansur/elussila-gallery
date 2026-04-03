@@ -117,3 +117,26 @@ button {
 .btn-primary:active {
   transform: scale(0.98);
 }
+
+/* Masonry Layout for Gallery */
+.masonry-grid {
+  column-count: 1;
+  column-gap: 40px;
+  padding: 20px 0;
+}
+
+@media (min-width: 768px) {
+  .masonry-grid { column-count: 2; }
+}
+
+@media (min-width: 1200px) {
+  .masonry-grid { column-count: 3; }
+}
+
+.masonry-item {
+  break-inside: avoid-column;
+  margin-bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

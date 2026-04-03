@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
+import Link from 'next/link';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -19,10 +20,11 @@ export default function RootLayout({
     <html lang="es" className={`${inter.variable} ${playfair.variable}`}>
       <body className="layout-container">
         <header className="main-header">
-          <div className="gallery-logo">Elussila</div>
+          <Link href="/" className="gallery-logo">Elussila</Link>
           <nav className="main-navigation">
-            <a href="/gallery">Galería</a>
-            <a href="/admin" className="admin-link">Acceso Administración</a>
+            <Link href="/gallery">Galería</Link>
+            <Link href="/about">Biografía</Link>
+            <Link href="/admin" className="admin-link">Autores</Link>
           </nav>
         </header>
         {children}
