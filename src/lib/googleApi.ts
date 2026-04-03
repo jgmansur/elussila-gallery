@@ -65,7 +65,7 @@ export async function appendToSheet(auth: any, rowData: any[]) {
   const sheets = google.sheets({ version: 'v4', auth });
   
   await sheets.spreadsheets.values.append({
-    spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
     range: 'Inventario!A:E',
     valueInputOption: 'USER_ENTERED',
     requestBody: {

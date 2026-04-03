@@ -71,27 +71,33 @@ export async function getArtworks(): Promise<Artwork[]> {
 
 export async function addArtwork(artwork: Artwork) {
   const auth = await getGoogleAuth();
-  if (!auth) return;
+  if (!auth) throw new Error("Accion cancelada: Error de autenticacion con Google.");
+  if (!SPREADSHEET_ID) throw new Error("Error: GOOGLE_SHEET_ID no configurada.");
 
   const sheets = google.sheets({ version: 'v4', auth });
   
-  const values = [
-    [
-      artwork.id,
-      artwork.title,
-      artwork.price,
-      artwork.details,
-      JSON.stringify(artwork.images),
-      artwork.createdAt
-    ]
-  ];
+  try {
+    const values = [
+      [
+        artwork.id,
+        artwork.title,
+        artwork.price,
+        artwork.details,
+        JSON.stringify(artwork.images),
+        artwork.createdAt
+      ]
+    ];
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A:F`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values },
-  });
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!A:F`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+  } catch (error: any) {
+    console.error("Error al guardar en Sheets:", error.message);
+    throw new Error(`Error de Google Sheets: ${error.message}`);
+  }
 }
 
 export async function deleteArtworkById(id: string) {

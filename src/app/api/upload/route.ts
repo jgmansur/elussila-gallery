@@ -49,8 +49,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, artworkId: newEntry.id });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error al procesar la subida múltiple:", error);
-    return NextResponse.json({ error: "No se pudo publicar la obra." }, { status: 500 });
+    const errorMessage = error.message || "No se pudo publicar la obra.";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
