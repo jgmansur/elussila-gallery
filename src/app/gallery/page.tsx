@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Align with the DB Artwork interface
 interface Artwork {
@@ -17,22 +17,23 @@ export default function Gallery() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch real data from the local API DB
     fetch('/api/inventory')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
           setArtworks(data);
         }
+        setLoading(false);
       })
-      .catch();
+      .catch(() => setLoading(false));
   }, []);
 
   const openModal = (art: Artwork) => {
     setSelectedArtwork(art);
-    setCurrentImageIndex(0); // Always start at the first image
+    setCurrentImageIndex(0);
     document.body.style.overflow = 'hidden'; 
   };
 
@@ -41,15 +42,15 @@ export default function Gallery() {
     document.body.style.overflow = 'auto'; 
   };
 
-  const nextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (selectedArtwork) {
       setCurrentImageIndex((prev) => (prev + 1) % selectedArtwork.images.length);
     }
   };
 
-  const prevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (selectedArtwork) {
       setCurrentImageIndex((prev) => (prev - 1 + selectedArtwork.images.length) % selectedArtwork.images.length);
     }
@@ -57,178 +58,145 @@ export default function Gallery() {
 
   return (
     <main className="main-content">
-      <h1 style={{ fontSize: 'var(--text-xl)', marginBottom: '8px', textAlign: 'center' }}>Colección de Arte</h1>
-      <p style={{ fontSize: 'var(--text-base)', color: 'var(--muted-text)', textAlign: 'center', marginBottom: '48px' }}>
-        Obras disponibles en distintos formatos.
-      </p>
+      <header style={{ marginBottom: 'var(--space-xl)', textAlign: 'left' }}>
+        <motion.h1 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          style={{ fontSize: 'var(--text-xl)', letterSpacing: '-0.04em' }}
+        >
+          Colección <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--text-muted)' }}>Curada</span>
+        </motion.h1>
+        <motion.p 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          style={{ fontSize: 'var(--text-base)', color: 'var(--text-secondary)', maxWidth: '600px', marginTop: 'var(--space-sm)' }}
+        >
+          Una exploración de la forma y la materia. Cada pieza ha sido seleccionada por su diálogo único con el espacio contemporáneo.
+        </motion.p>
+      </header>
       
-      {artworks.length === 0 ? (
-        <p style={{ textAlign: 'center', color: 'var(--muted-text)', fontSize: 'var(--text-lg)' }}>
-          No hay obras publicadas en la galería aún.
-        </p>
+      {loading ? (
+        <div style={{ height: '40vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ width: '40px', height: '40px', border: '2px solid var(--border)', borderTopColor: 'var(--text-primary)', borderRadius: '50%' }} />
+        </div>
+      ) : artworks.length === 0 ? (
+        <section style={{ height: '40vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.02)', borderRadius: 'var(--radius-lg)' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-md)' }}>Próximamente nuevas obras.</p>
+        </section>
       ) : (
-        <div className="masonry-grid">
-          {artworks.map(art => (
-            <div key={art.id} className="masonry-item" onClick={() => openModal(art)} style={{ cursor: 'pointer' }}>
-              <div style={{ 
-                  backgroundColor: '#e0dcd9', 
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                  transition: 'transform 0.2s',
-                  position: 'relative'
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-              >
-                {/* Always show the FIRST image as the grid cover */}
+        <div className="artwork-grid">
+          {artworks.map((art, index) => (
+            <motion.div 
+              key={art.id} 
+              layoutId={art.id}
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: index * 0.1, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="artwork-card" 
+              onClick={() => openModal(art)} 
+              style={{ cursor: 'pointer' }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div style={{ position: 'relative', overflow: 'hidden', backgroundColor: '#F0EBE6' }}>
                 {art.images.length > 0 && (
                   <img 
                     src={art.images[0].url} 
                     alt={art.title} 
-                    style={{ width: '100%', height: 'auto', display: 'block' }} 
+                    style={{ width: '100%', height: 'auto', display: 'block', transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}
+                    className="artwork-image"
                   />
                 )}
-                {/* Indicator if there are multiple photos */}
                 {art.images.length > 1 && (
-                  <div style={{ position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 12px', borderRadius: '16px', fontSize: '14px', fontWeight: 600 }}>
-                    {art.images.length} fotos
+                  <div className="glass" style={{ position: 'absolute', bottom: '16px', right: '16px', padding: '4px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                    {art.images.length} Fotos
                   </div>
                 )}
               </div>
-              <div style={{ paddingTop: '16px' }}>
-                <h3 style={{ fontSize: 'var(--text-md)', margin: '0 0 4px 0', fontFamily: 'var(--font-inter)' }}>{art.title}</h3>
-                <p style={{ color: 'var(--muted-text)', fontSize: 'var(--text-base)', margin: 0 }}>{art.details}</p>
-                <p style={{ fontWeight: 600, fontSize: 'var(--text-md)', marginTop: '8px' }}>{art.price}</p>
+              <div style={{ padding: 'var(--space-md)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 600 }}>{art.title}</h3>
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-secondary)' }}>{art.price}</span>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: '4px' }}>{art.details}</p>
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
 
-      {/* Fullscreen Carousel Modal */}
-      {selectedArtwork && selectedArtwork.images.length > 0 && (
-        <div 
-          onClick={closeModal}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(10, 10, 10, 0.98)', // Darker, cinematic background
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '16px', // Reduced padding for maximizing image size
-            cursor: 'zoom-out'
-          }}
-        >
-          {/* Close button */}
-          <button 
+      {/* Premium Carousel Modal */}
+      <AnimatePresence>
+        {selectedArtwork && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             onClick={closeModal}
             style={{
-              position: 'absolute',
-              top: '24px',
-              right: '24px',
-              color: 'var(--bg-color)',
-              fontSize: '48px',
-              lineHeight: 1,
-              fontFamily: 'var(--font-inter)',
-              zIndex: 1010
-            }}
-          >
-            &times;
-          </button>
-
-          {/* Modal Content container: Maximized space */}
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            style={{ 
-              backgroundColor: 'transparent',
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center', 
-              alignItems: 'center',
-              cursor: 'default',
-              position: 'relative'
-            }}
-          >
-            {/* CAROUSEL CONTROLS */}
-            {selectedArtwork.images.length > 1 && (
-              <>
-                <button onClick={prevImage} style={{ 
-                  position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
-                  backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: 'none',
-                  width: '64px', height: '64px', borderRadius: '50%', fontSize: '32px', cursor: 'pointer',
-                  display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1010
-                }}>
-                  &#10094;
-                </button>
-                <button onClick={nextImage} style={{ 
-                  position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
-                  backgroundColor: 'rgba(255,255,255,0.1)', color: 'white', border: 'none',
-                  width: '64px', height: '64px', borderRadius: '50%', fontSize: '32px', cursor: 'pointer',
-                  display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1010
-                }}>
-                  &#10095;
-                </button>
-                
-                {/* Dots indicator */}
-                <div style={{ position: 'absolute', bottom: '100px', display: 'flex', gap: '8px', zIndex: 1010 }}>
-                  {selectedArtwork.images.map((_, idx) => (
-                    <div key={idx} style={{ 
-                      width: '10px', height: '10px', borderRadius: '50%', 
-                      backgroundColor: idx === currentImageIndex ? 'white' : 'rgba(255,255,255,0.3)',
-                      transition: 'background-color 0.3s'
-                    }} />
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Enlarged Image section */}
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', maxHeight: 'calc(100vh - 120px)' }}>
-              <img 
-                src={selectedArtwork.images[currentImageIndex].url} 
-                alt={`${selectedArtwork.title} - ${currentImageIndex + 1}`} 
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '100%', 
-                  objectFit: 'contain', 
-                  display: 'block',
-                  boxShadow: '0 12px 48px rgba(0,0,0,0.5)'
-                }} 
-              />
-            </div>
-
-            {/* Details section floating at the bottom */}
-            <div style={{ 
-              width: '100%', maxWidth: '800px', padding: '24px', 
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: '16px', marginTop: '16px', color: 'white',
+              position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)', zIndex: 2000,
+              display: 'flex', flexDirection: 'column', padding: 'var(--space-md)', cursor: 'zoom-out',
               backdropFilter: 'blur(10px)'
-            }}>
-              <div>
-                <h2 style={{ fontSize: 'var(--text-lg)', margin: '0 0 4px 0', fontFamily: 'var(--font-playfair)' }}>
-                  {selectedArtwork.title}
-                </h2>
-                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 'var(--text-base)', margin: 0 }}>
-                  {selectedArtwork.details}
-                </p>
+            }}
+          >
+            {/* Close UI */}
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={closeModal}
+              style={{ position: 'absolute', top: '32px', right: '32px', fontSize: '32px', zIndex: 2100 }}
+            >
+              ×
+            </motion.button>
+
+            <div 
+              onClick={(e) => e.stopPropagation()} 
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'default' }}
+            >
+              {/* Main Image Container */}
+              <div style={{ position: 'relative', width: '100%', maxWidth: '1000px', height: '70vh', display: 'flex', justifyContent: 'center' }}>
+                <AnimatePresence mode="wait">
+                  <motion.img 
+                    key={currentImageIndex}
+                    src={selectedArtwork.images[currentImageIndex].url}
+                    initial={{ x: 20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: -20, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)' }}
+                    onClick={() => selectedArtwork.images.length > 1 && nextImage()}
+                  />
+                </AnimatePresence>
+
+                {selectedArtwork.images.length > 1 && (
+                  <div style={{ position: 'absolute', bottom: '-48px', display: 'flex', gap: '12px' }}>
+                    <button onClick={prevImage} style={{ fontSize: '1.5rem', opacity: 0.5 }}>←</button>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {selectedArtwork.images.map((_, i) => (
+                        <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i === currentImageIndex ? 'var(--text-primary)' : 'var(--border)' }} />
+                      ))}
+                    </div>
+                    <button onClick={nextImage} style={{ fontSize: '1.5rem', opacity: 0.5 }}>→</button>
+                  </div>
+                )}
               </div>
-              <p style={{ fontWeight: 600, fontSize: 'var(--text-lg)', margin: 0 }}>
-                {selectedArtwork.price}
-              </p>
+
+              {/* Artwork Info - Clean & Floating */}
+              <motion.div 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                style={{ marginTop: 'var(--space-xl)', textAlign: 'center', maxWidth: '600px' }}
+              >
+                <h2 style={{ fontSize: 'var(--text-lg)', fontFamily: 'var(--font-serif)' }}>{selectedArtwork.title}</h2>
+                <p style={{ color: 'var(--text-secondary)', marginTop: '8px' }}>{selectedArtwork.details}</p>
+                <div style={{ marginTop: '16px', fontWeight: 600, fontSize: 'var(--text-md)' }}>{selectedArtwork.price}</div>
+              </motion.div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

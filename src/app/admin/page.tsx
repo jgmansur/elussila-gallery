@@ -1,48 +1,97 @@
+'use client';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
 export default function AdminDashboard() {
+  const adminCards = [
+    { 
+      title: 'Subir Nueva Obra', 
+      href: '/admin/upload', 
+      icon: '📸', 
+      description: 'Publica fotos directamente a Google Drive y Sheets.',
+      primary: true 
+    },
+    { 
+      title: 'Inventario y Drive', 
+      href: '/admin/inventory', 
+      icon: '🗑️', 
+      description: 'Gestiona existencias y elimina archivos de la nube.' 
+    },
+    { 
+      title: 'Mi Biografía', 
+      href: '/admin/about', 
+      icon: '✍️', 
+      description: 'Actualiza tu perfil y texto de presentación.' 
+    },
+    { 
+      title: 'Ver Galería', 
+      href: '/gallery', 
+      icon: '🏠', 
+      description: 'Ver cómo luce tu sitio para el público.' 
+    },
+  ];
+
   return (
-    <main className="main-content" style={{ display: 'flex', flexDirection: 'column', minHeight: '80vh', gap: '32px' }}>
-      <header>
-        <h1 style={{ fontSize: 'var(--text-xl)' }}>Portal de Administración</h1>
-        <p style={{ color: 'var(--muted-text)', fontSize: 'var(--text-md)' }}>
-          Bienvenida, Elussila. ¿Qué te gustaría hacer hoy?
-        </p>
+    <main className="main-content">
+      <header style={{ marginBottom: 'var(--space-xl)' }}>
+        <motion.h1 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          style={{ fontSize: 'var(--text-xl)', marginBottom: 'var(--space-xs)' }}
+        >
+          Portal de <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontWeight: 400 }}>Gestión</span>
+        </motion.h1>
+        <motion.p 
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          style={{ color: 'var(--text-secondary)', fontSize: 'var(--text-base)' }}
+        >
+          Bienvenida, Elussila. Administra tu legado artístico desde aquí.
+        </motion.p>
       </header>
 
-      <section style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1, justifyContent: 'center', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-        <Link href="/admin/upload" style={{ 
-          backgroundColor: 'var(--text-color)', color: 'var(--bg-color)', 
-          padding: '40px 24px', borderRadius: '16px', fontSize: 'var(--text-lg)',
-          fontWeight: 600, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center'
-        }}>
-          <span style={{ fontSize: '48px' }}>📸</span>
-          Subir Nueva Obra
-        </Link>
-        
-        <Link href="/admin/inventory" style={{ 
-          backgroundColor: '#ffebeb', color: '#cc0000', 
-          padding: '32px 24px', borderRadius: '16px', fontSize: 'var(--text-md)',
-          fontWeight: 600, textAlign: 'center', display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <span>🗑️</span> Administrar Inventario y Drive
-        </Link>
-        
-        <Link href="/admin/about" style={{ 
-          backgroundColor: '#D1CAC2', color: 'var(--text-color)', 
-          padding: '32px 24px', borderRadius: '16px', fontSize: 'var(--text-md)',
-          fontWeight: 600, textAlign: 'center', display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center'
-        }}>
-          <span>✍️</span> Editar Mi Biografía
-        </Link>
-        
-        <Link href="/gallery" style={{ 
-          backgroundColor: '#EAE5E0', color: 'var(--text-color)', 
-          padding: '32px 24px', borderRadius: '16px', fontSize: 'var(--text-md)',
-          fontWeight: 500, textAlign: 'center'
-        }}>
-          Ver Mi Galería Pública
-        </Link>
+      <section className="broken-grid" style={{ minHeight: '60vh' }}>
+        {adminCards.map((card, index) => (
+          <motion.div
+            key={card.href}
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: index * 0.1, type: 'spring', damping: 25 }}
+            style={{ 
+              gridColumn: index % 2 === 0 ? 'span 6' : 'span 6',
+              height: '100%'
+            }}
+          >
+            <Link href={card.href}>
+              <motion.div
+                whileHover={{ y: -5, scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                className="glass"
+                style={{ 
+                  padding: 'var(--space-lg)',
+                  borderRadius: 'var(--radius-lg)',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-sm)',
+                  border: card.primary ? '1px solid var(--text-primary)' : '1px solid var(--border)',
+                  backgroundColor: card.primary ? 'rgba(0,0,0,0.02)' : 'var(--bg-surface)'
+                }}
+              >
+                <span style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-sm)' }}>{card.icon}</span>
+                <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600 }}>{card.title}</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>{card.description}</p>
+                
+                <div style={{ marginTop: 'auto', paddingTop: 'var(--space-md)', alignSelf: 'flex-start' }}>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                    Acceder →
+                  </span>
+                </div>
+              </motion.div>
+            </Link>
+          </motion.div>
+        ))}
       </section>
     </main>
   );
