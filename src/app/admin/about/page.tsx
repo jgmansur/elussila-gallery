@@ -1,36 +1,50 @@
 'use client';
-import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 export default function EditBiography() {
-  const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   
-  const [title, setTitle] = useState('Eva González: El Arte de Reinventarse');
-  const [bioText, setBioText] = useState(
-    `Originaria de Tamaulipas, Eva es una artista polifacética cuya vida ha sido un lienzo en constante evolución. Su camino en las artes comenzó con la música, donde destacó como una voz privilegiada, para después conquistar el mundo del diseño textil fundando su propia maquiladora en Ciudad Victoria.\n\nImpulsada por el amor y la visión, Eva emprendió una misión fundamental: la carrera de sus hijos, Jay y Xeronimo Mansur. Con el apoyo incondicional y el legado de su esposo, el Dr. Juan Guillermo Mansur Arzola (Q.E.P.D.), se estableció en Miami, logrando posicionarse en la élite de la industria musical. Su paso por Sasha Enterprises la llevó a colaborar en el management de figuras de talla mundial como Chayanne, Alicia Machado y El Puma, además de impulsar el surgimiento de nuevos talentos del reggaetón.\n\nHoy, de regreso en su tierra, Eva ha volcado toda esa experiencia cosmopolita en las artes plásticas y la joyería de autor. A través del óleo con espátula, el acrílico y la intervención en madera, crea piezas de arte moderno que reflejan un espíritu que se niega a envejecer. Eva no solo pinta; captura la energía de una vida dedicada a la creación, demostrando que el alma joven siempre tiene un nuevo sueño por alcanzar.`
-  );
+  const [title, setTitle] = useState('');
+  const [bioText, setBioText] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-  const handleImageClick = () => fileInputRef.current?.click();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
+  useEffect(() => {
+    async function fetchData() {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      if (data) {
+        setTitle(data.title || '');
+        setBioText(data.bio || '');
+        setImageUrl(data.imageUrl || '');
+        setPreview(data.imageUrl || null);
+      }
     }
-  };
+    fetchData();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('loading');
-    setTimeout(() => {
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, bio: bioText, imageUrl: imageUrl || preview || '' }),
+      });
+
+      if (!res.ok) throw new Error('Error al guardar');
+
       setStatus('success');
       setTimeout(() => setStatus('idle'), 3000);
-    }, 1500);
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
   };
 
   return (
@@ -48,36 +62,9 @@ export default function EditBiography() {
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
         
-        {/* Photo Selection */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-          <h2 style={{ fontSize: 'var(--text-base)', fontWeight: 600 }}>1. Fotografía de Perfil</h2>
-          <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} capture="user" />
-          
-          <motion.div 
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={handleImageClick}
-            className="glass"
-            style={{ 
-              minHeight: '300px', cursor: 'pointer', borderRadius: 'var(--radius-lg)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden', border: '1px dashed var(--border)', background: 'rgba(0,0,0,0.02)'
-            }}
-          >
-            {preview ? (
-              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex' }}>
-                <img src={preview} alt="Perfil" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '600px' }} />
-                <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)' }} className="glass">
-                  <span style={{ padding: '8px 16px', fontSize: 'var(--text-xs)', fontWeight: 600 }}>Cambiar Fotografía</span>
-                </div>
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center' }}>
-                <span style={{ fontSize: '48px', display: 'block', marginBottom: '8px' }}>🤳</span>
-                <p style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Capturar o seleccionar foto</p>
-              </div>
-            )}
-          </motion.div>
+        {/* Photo Status Info */}
+        <section className="glass" style={{ padding: 'var(--space-sm)', fontSize: 'var(--text-xs)', opacity: 0.8 }}>
+          ℹ️ La actualización de la foto requiere configuración de Drive. Por ahora se guarda la referencia actual.
         </section>
 
         {/* Text Fields */}
@@ -87,8 +74,43 @@ export default function EditBiography() {
             <input 
               type="text" value={title} onChange={e => setTitle(e.target.value)}
               style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--border)', padding: '12px 0', fontSize: 'var(--text-md)', fontFamily: 'var(--font-serif)', outline: 'none' }}
+              placeholder="Ej: Eva González: Una Vida de Creación"
               required 
             />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: 'var(--text-xs)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              URL de foto principal
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={e => {
+                setImageUrl(e.target.value);
+                setPreview(e.target.value || null);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid var(--border)',
+                padding: '12px 0',
+                fontSize: 'var(--text-sm)',
+                fontFamily: 'var(--font-main)',
+                outline: 'none',
+              }}
+              placeholder="https://..."
+            />
+            {preview && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview}
+                  alt="Vista previa biografia"
+                  style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: 'var(--radius-md)', marginTop: '8px' }}
+                />
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -96,6 +118,8 @@ export default function EditBiography() {
             <textarea 
               value={bioText} onChange={e => setBioText(e.target.value)} rows={12}
               style={{ background: 'transparent', border: 'none', padding: '12px 0', fontSize: 'var(--text-base)', fontFamily: 'var(--font-main)', outline: 'none', resize: 'none', lineHeight: 1.6 }}
+              placeholder="Escribe tu historia aquí..."
+              required
             />
           </div>
         </div>
@@ -106,9 +130,9 @@ export default function EditBiography() {
           type="submit" 
           disabled={status === 'loading'}
           className="btn-premium"
-          style={{ alignSelf: 'flex-start', background: status === 'success' ? '#008000' : 'var(--text-primary)' }}
+          style={{ alignSelf: 'flex-start', background: status === 'success' ? '#008000' : status === 'error' ? '#D00000' : 'var(--text-primary)' }}
         >
-          {status === 'loading' ? 'Guardando...' : status === 'success' ? '✓ Biografía Actualizada' : 'Publicar Cambios'}
+          {status === 'loading' ? 'Guardando...' : status === 'success' ? '✓ Biografía Actualizada' : status === 'error' ? 'Error al Guardar' : 'Publicar Cambios'}
         </motion.button>
 
       </form>

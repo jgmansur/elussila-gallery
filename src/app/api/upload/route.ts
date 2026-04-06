@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { getGoogleAuth, uploadToDrive } from '@/lib/googleApi';
 import { addArtwork } from '@/lib/db';
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'No se pudo publicar la obra.';
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
@@ -34,6 +42,10 @@ export async function POST(request: Request) {
         uploadedImages.push({ id, url });
       }
     }
+
+    if (uploadedImages.length === 0) {
+      return NextResponse.json({ error: 'No se pudieron subir imágenes válidas.' }, { status: 400 });
+    }
     
     const newEntry = {
       id: Date.now().toString(), // Generamos un ID único local
@@ -49,9 +61,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, artworkId: newEntry.id });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error al procesar la subida múltiple:", error);
-    const errorMessage = error.message || "No se pudo publicar la obra.";
+    const errorMessage = getErrorMessage(error);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

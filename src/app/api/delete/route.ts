@@ -2,9 +2,22 @@ import { NextResponse } from 'next/server';
 import { getGoogleAuth, deleteFromDrive } from '@/lib/googleApi';
 import { getArtworks, deleteArtworkById, updateArtworkImages } from '@/lib/db';
 
+interface DeleteBody {
+  artworkId?: string;
+  imageId?: string;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Fallo eliminando recurso.';
+}
+
 export async function POST(request: Request) {
   try {
-    const { artworkId, imageId } = await request.json();
+    const { artworkId, imageId } = (await request.json()) as DeleteBody;
     
     if (!artworkId) {
       return NextResponse.json({ error: "Falta artworkId" }, { status: 400 });
@@ -43,8 +56,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, message: "Obra y archivos de Drive eliminados" });
 
-  } catch (error) {
-    console.error("Error al borrar elementos:", error);
-    return NextResponse.json({ error: "Fallo eliminando recurso." }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('Error al borrar elementos:', error);
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

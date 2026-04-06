@@ -1,8 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/admin/login');
+    router.refresh();
+  };
+
   const adminCards = [
     { 
       title: 'Subir Nueva Obra', 
@@ -34,6 +43,23 @@ export default function AdminDashboard() {
   return (
     <main className="main-content">
       <header style={{ marginBottom: 'var(--space-xl)' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-sm)' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--radius-full)',
+              border: '1px solid var(--border)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            Cerrar sesión
+          </button>
+        </div>
         <motion.h1 
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 
 // Basic type mirroring the db structure
 interface Artwork {
@@ -109,7 +110,7 @@ export default function Inventory() {
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                     {art.images.map((img, idx) => (
                       <div key={img.id} style={{ width: '64px', height: '64px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', backgroundColor: 'var(--border)' }}>
-                        <img src={img.url} alt={`Obra ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <Image src={img.url} alt={`Obra ${idx}`} width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </div>
                     ))}
                   </div>

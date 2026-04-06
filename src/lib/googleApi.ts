@@ -1,11 +1,24 @@
 import { google } from 'googleapis';
+import type { Auth, drive_v3 } from 'googleapis';
+import { Readable } from 'stream';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/spreadsheets'
 ];
 
-export async function getGoogleAuth() {
+const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+const MAKE_FILES_PUBLIC = process.env.GOOGLE_DRIVE_PUBLIC !== 'false';
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Error desconocido';
+}
+
+export async function getGoogleAuth(): Promise<Auth.GoogleAuth> {
   const rawCredentials = process.env.GOOGLE_CREDENTIALS;
   if (!rawCredentials) {
     throw new Error("ERROR CRÍTICO: La variable GOOGLE_CREDENTIALS no está configurada en el servidor (Vercel).");
@@ -14,8 +27,8 @@ export async function getGoogleAuth() {
   let credentials;
   try {
     credentials = JSON.parse(rawCredentials);
-  } catch (parseError: any) {
-    throw new Error(`ERROR DE SINTAXIS JSON: Las credenciales en Vercel tienen un formato inválido. Asegúrate de que no tengan comillas extra al principio. Detalle: ${parseError.message}`);
+  } catch (parseError: unknown) {
+    throw new Error(`ERROR DE SINTAXIS JSON: Las credenciales en Vercel tienen un formato inválido. Asegúrate de que no tengan comillas extra al principio. Detalle: ${getErrorMessage(parseError)}`);
   }
   
   if (!credentials.private_key) {
@@ -33,14 +46,22 @@ export async function getGoogleAuth() {
   return auth;
 }
 
-export async function uploadToDrive(auth: any, fileName: string, mimeType: string, fileStream: any) {
-  if (!auth) return { id: "mock_id_123", url: "MOCK_DRIVE_URL_12345" };
+export async function uploadToDrive(
+  auth: Auth.GoogleAuth,
+  fileName: string,
+  mimeType: string,
+  fileBuffer: Buffer
+): Promise<{ id: string; url: string }> {
+  if (!DRIVE_FOLDER_ID) {
+    throw new Error('Falta GOOGLE_DRIVE_FOLDER_ID. Define una carpeta fija de tu Drive para subir fotos.');
+  }
 
   const drive = google.drive({ version: 'v3', auth });
+  const fileStream = Readable.from(fileBuffer);
    
-  const fileMetadata = {
+  const fileMetadata: drive_v3.Schema$File = {
     name: fileName,
-    parents: ['1BrBgwCSercYBcRJBuEsm27Q_OgjVX_Yu'], // Hardcoded Folder ID provided by user
+    parents: [DRIVE_FOLDER_ID],
   };
   
   const media = {
@@ -48,40 +69,40 @@ export async function uploadToDrive(auth: any, fileName: string, mimeType: strin
     body: fileStream,
   };
 
-  const response = await drive.files.create({
-    requestBody: fileMetadata,
-    media: media,
-    fields: 'id, webViewLink',
-  });
+  try {
+    const response = await drive.files.create({
+      requestBody: fileMetadata,
+      media,
+      fields: 'id',
+    });
 
-  return { 
-    id: response.data.id, 
-    url: response.data.webViewLink 
-  };
+    const fileId = response.data.id;
+    if (!fileId) {
+      throw new Error('Drive no devolvió un ID de archivo.');
+    }
+
+    if (MAKE_FILES_PUBLIC) {
+      await drive.permissions.create({
+        fileId,
+        requestBody: {
+          role: 'reader',
+          type: 'anyone',
+        },
+      });
+    }
+
+    return {
+      id: fileId,
+      url: `https://drive.google.com/uc?export=view&id=${fileId}`,
+    };
+  } catch (error: unknown) {
+    throw new Error(
+      `Error subiendo a Drive. Verifica que la carpeta exista y esté compartida al service account con permiso de Editor. Detalle: ${getErrorMessage(error)}`
+    );
+  }
 }
 
-export async function deleteFromDrive(auth: any, fileId: string) {
-  if (!auth) {
-    console.log("MOCK: Deleted file", fileId);
-    return true;
-  }
-  
+export async function deleteFromDrive(auth: Auth.GoogleAuth, fileId: string): Promise<void> {
   const drive = google.drive({ version: 'v3', auth });
   await drive.files.delete({ fileId });
-  return true;
-}
-
-export async function appendToSheet(auth: any, rowData: any[]) {
-  if (!auth) return "MOCK_SHEET_UPDATE_SUCCESS";
-
-  const sheets = google.sheets({ version: 'v4', auth });
-  
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: 'Inventario!A:E',
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [rowData],
-    },
-  });
 }

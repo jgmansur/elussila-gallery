@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 
 // Align with the DB Artwork interface
 interface Artwork {
@@ -20,6 +21,14 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    document.body.style.overflow = selectedArtwork ? 'hidden' : 'auto';
+
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [selectedArtwork]);
+
+  useEffect(() => {
     fetch('/api/inventory')
       .then(res => res.json())
       .then(data => {
@@ -34,12 +43,10 @@ export default function Gallery() {
   const openModal = (art: Artwork) => {
     setSelectedArtwork(art);
     setCurrentImageIndex(0);
-    document.body.style.overflow = 'hidden'; 
   };
 
   const closeModal = () => {
     setSelectedArtwork(null);
-    document.body.style.overflow = 'auto'; 
   };
 
   const nextImage = (e?: React.MouseEvent) => {
@@ -100,9 +107,12 @@ export default function Gallery() {
             >
               <div style={{ position: 'relative', overflow: 'hidden', backgroundColor: '#F0EBE6' }}>
                 {art.images.length > 0 && (
-                  <img 
-                    src={art.images[0].url} 
-                    alt={art.title} 
+                  <Image
+                    src={art.images[0].url}
+                    alt={art.title}
+                    width={1200}
+                    height={900}
+                    sizes="(max-width: 768px) 100vw, 50vw"
                     style={{ width: '100%', height: 'auto', display: 'block', transition: 'transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)' }}
                     className="artwork-image"
                   />
@@ -165,17 +175,25 @@ export default function Gallery() {
               {/* Main Image Container */}
               <div style={{ position: 'relative', width: '100%', maxWidth: '1000px', height: '60vh', minHeight: '300px', display: 'flex', justifyContent: 'center' }}>
                 <AnimatePresence mode="wait">
-                  <motion.img 
+                  <motion.div
                     key={currentImageIndex}
-                    src={selectedArtwork.images[currentImageIndex].url}
                     initial={{ x: 20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     exit={{ x: -20, opacity: 0 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }}
-                    onClick={() => selectedArtwork.images.length > 1 && nextImage()}
-                    draggable={false}
-                  />
+                    style={{ maxWidth: '100%', maxHeight: '100%' }}
+                  >
+                    <Image
+                      src={selectedArtwork.images[currentImageIndex].url}
+                      alt={selectedArtwork.title}
+                      width={1200}
+                      height={1200}
+                      sizes="(max-width: 768px) 100vw, 80vw"
+                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }}
+                      onClick={() => selectedArtwork.images.length > 1 && nextImage()}
+                      draggable={false}
+                    />
+                  </motion.div>
                 </AnimatePresence>
 
                 {selectedArtwork.images.length > 1 && (

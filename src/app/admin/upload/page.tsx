@@ -58,8 +58,9 @@ export default function UploadPage() {
       } else {
         setMessage(`❌ Error: ${data.error || "No se pudo publicar."}`);
       }
-    } catch (error: any) {
-      setMessage(`❌ Falla: ${error.message || "Error de red."}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error de red.';
+      setMessage(`❌ Falla: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -179,6 +180,7 @@ export default function UploadPage() {
                   exit={{ scale: 0.8, opacity: 0 }}
                   style={{ position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden', paddingBottom: '100%' }}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt="Vista previa" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button 
                     onClick={() => removeFile(index)} 
