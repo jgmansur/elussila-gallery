@@ -12,5 +12,22 @@
         "destination": "/index.html"
       }
     ]
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "us-central1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Elussila Gallery",
+        "supportEmail": "jay@jaystudio.co"
+      }
+    }
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

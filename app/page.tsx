@@ -1,18 +1,40 @@
-import Image from "next/image";
+"use client";
 
-// Placeholder data representing future Firebase photos
-const photos = [
-  { id: 1, url: "https://images.unsplash.com/photo-1542038786656-148f9b418b0e?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-[4/3]", alt: "Camera" },
-  { id: 2, url: "https://images.unsplash.com/photo-1581458296305-653bc0e38622?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-[2/3]", alt: "Portrait" },
-  { id: 3, url: "https://images.unsplash.com/photo-1516205651411-aef33a44f7c2?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-[3/4]", alt: "Landscape" },
-  { id: 4, url: "https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-square", alt: "Architecture" },
-  { id: 5, url: "https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-[4/5]", alt: "Nature" },
-  { id: 6, url: "https://images.unsplash.com/photo-1541845157-a6d2d100c931?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-[3/2]", alt: "Street" },
-  { id: 7, url: "https://images.unsplash.com/photo-1444491741275-3747c53d99b4?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-[3/4]", alt: "Abstract" },
-  { id: 8, url: "https://images.unsplash.com/photo-1534067783941-51c9c23edfcc?q=80&w=600&auto=format&fit=crop", aspectRatio: "aspect-square", alt: "Fashion" },
-];
+import Image from "next/image";
+import { useEffect, useState } from "react";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+type Photo = {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+};
 
 export default function Home() {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "gallery"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedPhotos = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          url: data.url,
+          width: data.width || 800,
+          height: data.height || 800,
+        };
+      });
+      setPhotos(fetchedPhotos);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   return (
     <main className="min-h-screen py-16 px-4 sm:px-8 max-w-7xl mx-auto">
       <header className="mb-16 text-center space-y-4">
@@ -26,30 +48,44 @@ export default function Home() {
 
       {/* Masonry Grid */}
       <section className="masonry-grid">
-        {photos.map((photo) => (
-          <div
-            key={photo.id}
-            className="masonry-item relative group overflow-hidden bg-zinc-900 rounded-lg shadow-xl cursor-pointer"
-          >
-            {/* Image Wrapper matches aspect ratio to avoid layout shift */}
-            <div className={`relative w-full ${photo.aspectRatio}`}>
-              <Image
-                src={photo.url}
-                alt={photo.alt}
-                fill
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              
-              {/* Overlay on Hover */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <span className="font-serif text-white font-medium tracking-widest uppercase text-sm border-b border-white/50 pb-1">
-                  View
-                </span>
+        {loading ? (
+          <div className="col-span-full py-20 text-center text-zinc-500">Cargando galería...</div>
+        ) : photos.length === 0 ? (
+          <div className="col-span-full py-20 text-center text-zinc-500">La galería está vacía. ¡Sube tu primera foto desde el Panel Administrativo!</div>
+        ) : (
+          photos.map((photo) => {
+            // Generar padding bottom porcentual para asegurar que el contenedor mantiene la proporción (aspect ratio dinámico)
+            const paddingPercentage = (photo.height / photo.width) * 100;
+
+            return (
+              <div
+                key={photo.id}
+                className="masonry-item relative group overflow-hidden bg-zinc-900 rounded-lg shadow-xl cursor-pointer"
+              >
+                {/* Dynamically size image wrapper */}
+                <div 
+                  className="relative w-full"
+                  style={{ paddingBottom: `${paddingPercentage}%` }}
+                >
+                  <Image
+                    src={photo.url}
+                    alt={"Photography"}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  
+                  {/* Overlay on Hover */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                    <span className="font-serif text-white font-medium tracking-widest uppercase text-sm border-b border-white/50 pb-1">
+                      View
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
+            );
+          })
+        )}
       </section>
 
       <footer className="mt-24 text-center pb-8 border-t border-zinc-800/50 pt-8">

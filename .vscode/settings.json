@@ -1,0 +1,17 @@
+{
+  "files.watcherExclude": {
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "**/out/**": true,
+    "**/.firebase/**": true
+  },
+  "search.exclude": {
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "**/out/**": true
+  },
+  "files.exclude": {
+    "**/.next": true,
+    "**/out": true
+  }
+}

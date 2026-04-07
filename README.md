@@ -18,6 +18,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Environment setup
+
+1. Copy `.env.example` to `.env.local`.
+2. Fill your Firebase and Google API values.
+
+If your AI editor hangs while working in this repo, keep `node_modules`, `.next`, and `out` excluded from indexing (included in `.vscode/settings.json`).
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
