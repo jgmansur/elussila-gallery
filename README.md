@@ -21,7 +21,13 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 ## Environment setup
 
 1. Copy `.env.example` to `.env.local`.
-2. Fill your Firebase and Google API values.
+2. Fill your Firebase values.
+3. Optional: set `NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_ID` to upload artworks into a specific Drive folder.
+
+## Google Drive uploads (admin)
+
+- Admin image uploads use Google Drive OAuth (`drive.file`) from the signed-in admin account.
+- The uploaded file is shared as public read for gallery display.
 
 If your AI editor hangs while working in this repo, keep `node_modules`, `.next`, and `out` excluded from indexing (included in `.vscode/settings.json`).
 

@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { signInWithPopup, User, signOut, onAuthStateChanged } from "firebase/auth";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { GoogleAuthProvider, reauthenticateWithPopup, signInWithPopup, User, signOut, onAuthStateChanged } from "firebase/auth";
+import { ref } from "firebase/storage";
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { auth, googleProvider, db, storage } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
 import { deleteObject } from "firebase/storage";
 
 // Lista de emails autorizados (Podés mover esto a Firestore después)
@@ -24,6 +24,7 @@ export default function AdminPage() {
   
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);
   const [editingArtwork, setEditingArtwork] = useState<any | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -33,6 +34,94 @@ export default function AdminPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const category = "Pintura";
+
+  const createDriveProvider = () => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope("https://www.googleapis.com/auth/drive.file");
+    provider.setCustomParameters({ prompt: "consent" });
+    return provider;
+  };
+
+  const getDriveAccessToken = async (): Promise<string> => {
+    if (driveAccessToken) return driveAccessToken;
+    if (!auth.currentUser) {
+      throw new Error("No hay usuario autenticado para Google Drive.");
+    }
+
+    const result = await reauthenticateWithPopup(auth.currentUser, createDriveProvider());
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+
+    if (!token) {
+      throw new Error("No se pudo obtener token de Google Drive.");
+    }
+
+    setDriveAccessToken(token);
+    return token;
+  };
+
+  const uploadImageToDrive = async (image: File, token: string) => {
+    const uploadResponse = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=media&fields=id", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": image.type || "application/octet-stream",
+      },
+      body: image,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`Drive upload failed: ${await uploadResponse.text()}`);
+    }
+
+    const uploaded = await uploadResponse.json();
+    const fileId = uploaded.id as string;
+    const folderId = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_ID;
+
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `${Date.now()}_${image.name}`,
+        ...(folderId ? { parents: [folderId] } : {}),
+      }),
+    });
+
+    const permissionResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ role: "reader", type: "anyone" }),
+    });
+
+    if (!permissionResponse.ok) {
+      throw new Error(`Drive permission failed: ${await permissionResponse.text()}`);
+    }
+
+    return {
+      fileId,
+      url: `https://drive.google.com/uc?export=view&id=${fileId}`,
+    };
+  };
+
+  const deleteImageFromDrive = async (fileId: string) => {
+    const token = await getDriveAccessToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Drive delete failed: ${await response.text()}`);
+    }
+  };
 
   useEffect(() => {
     const unsubApp = onAuthStateChanged(auth, (u) => {
@@ -59,7 +148,11 @@ export default function AdminPage() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, createDriveProvider());
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setDriveAccessToken(credential.accessToken);
+      }
     } catch (error) {
       console.error("Login failed", error);
       alert("Error al iniciar sesión.");
@@ -86,57 +179,38 @@ export default function AdminPage() {
 
     try {
       const { width, height } = await getImageDimensions(file);
-      const fileName = `${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, `artworks/${fileName}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const token = await getDriveAccessToken();
+      setProgress(15);
 
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const p = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setProgress(p);
-        },
-        (error) => {
-          console.error(error);
-          alert("Error subiendo imagen.");
-          setUploading(false);
-        },
-        async () => {
-          try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+      const uploaded = await uploadImageToDrive(file, token);
+      setProgress(75);
 
-            // Guardamos como OBRA completa
-            await addDoc(collection(db, "artworks"), {
-              title,
-              price: Number(price),
-              description,
-              category,
-              url: downloadUrl,
-              storagePath: `artworks/${fileName}`,
-              width,
-              height,
-              status: "available",
-              createdAt: serverTimestamp()
-            });
+      await addDoc(collection(db, "artworks"), {
+        title,
+        price: Number(price),
+        description,
+        category,
+        url: uploaded.url,
+        driveFileId: uploaded.fileId,
+        provider: "drive",
+        width,
+        height,
+        status: "available",
+        createdAt: serverTimestamp()
+      });
 
-            // Reset Form
-            setTitle("");
-            setPrice("");
-            setDescription("");
-            setFile(null);
-            setProgress(0);
-            alert("¡Obra publicada exitosamente!");
-          } catch (error) {
-            console.error("Error guardando obra en Firestore", error);
-            alert("La imagen subió, pero no se pudo guardar la obra. Revisá permisos de Firestore/Storage para tu email.");
-          } finally {
-            setUploading(false);
-          }
-        }
-      );
+      setProgress(100);
+      setTitle("");
+      setPrice("");
+      setDescription("");
+      setFile(null);
+      alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
       console.error(e);
+      alert("No se pudo subir la imagen a Google Drive. Verificá permisos OAuth y que la app de Google Drive esté habilitada.");
+    } finally {
       setUploading(false);
+      setProgress(0);
     }
   };
 
@@ -154,12 +228,15 @@ export default function AdminPage() {
     if (!confirm("¿Estás seguro de eliminar esta obra? Esta acción no se puede deshacer.")) return;
     
     try {
-      // 1. Delete from Storage
-      if (artwork.storagePath) {
+      if (artwork.driveFileId) {
+        await deleteImageFromDrive(artwork.driveFileId);
+      }
+      // Compatibilidad con obras antiguas en Firebase Storage
+      else if (artwork.storagePath) {
         const fileRef = ref(storage, artwork.storagePath);
         await deleteObject(fileRef);
       }
-      // 2. Delete from Firestore
+
       await deleteDoc(doc(db, "artworks", artwork.id));
     } catch (e) {
       console.error(e);
@@ -332,7 +409,7 @@ export default function AdminPage() {
                   <div className="text-center p-8">
                     <div className="w-16 h-16 border-4 border-zinc-800 border-t-white animate-spin rounded-full mx-auto mb-4"></div>
                     <p className="font-bold text-xl">{Math.round(progress)}%</p>
-                    <p className="text-zinc-500 text-sm">Subiendo a Cloud Storage...</p>
+                    <p className="text-zinc-500 text-sm">Subiendo a Google Drive...</p>
                   </div>
                 ) : file ? (
                   <div className="text-center p-8">
