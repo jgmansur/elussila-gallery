@@ -13,8 +13,25 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Elussila Gallery",
-  description: "A premium photography and art gallery experience.",
+  title: {
+    default: "Elu Sila | Fine Art Gallery",
+    template: "%s | Elu Sila"
+  },
+  description: "Galería de arte exclusiva de Elu Sila. Colecciones curadas de pintura, escultura y joyería para coleccionistas sofisticados.",
+  keywords: ["arte", "galería", "joyería de autor", "escultura moderna", "pintura", "Elu Sila"],
+  authors: [{ name: "Elu Sila" }],
+  openGraph: {
+    title: "Elu Sila | Fine Art Gallery",
+    description: "Piezas únicas de arte físico y digital.",
+    url: "https://elussila.art",
+    siteName: "Elu Sila Gallery",
+    locale: "es_AR",
+    type: "website",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
