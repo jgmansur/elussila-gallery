@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { signInWithPopup, User, signOut, onAuthStateChanged } from "firebase/auth";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
@@ -24,6 +25,12 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [artworks, setArtworks] = useState<any[]>([]);
+  const [editingArtwork, setEditingArtwork] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
+  const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const category = "Pintura";
 
@@ -154,6 +161,37 @@ export default function AdminPage() {
     }
   };
 
+  const openEditModal = (artwork: any) => {
+    setEditingArtwork(artwork);
+    setEditTitle(artwork.title || "");
+    setEditPrice(String(artwork.price ?? ""));
+    setEditDescription(artwork.description || "");
+    setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
+  };
+
+  const saveArtworkEdits = async () => {
+    if (!editingArtwork) return;
+    if (!editTitle.trim()) return alert("El título es obligatorio.");
+    if (!editPrice || Number(editPrice) <= 0) return alert("El precio debe ser mayor a 0.");
+
+    setSavingEdit(true);
+    try {
+      await updateDoc(doc(db, "artworks", editingArtwork.id), {
+        title: editTitle.trim(),
+        price: Number(editPrice),
+        description: editDescription,
+        status: editStatus,
+        category: "Pintura",
+      });
+      setEditingArtwork(null);
+    } catch (error) {
+      console.error(error);
+      alert("Error guardando cambios de la obra.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   if (loadingApp) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-white font-mono">
@@ -210,6 +248,9 @@ export default function AdminPage() {
             <p className="text-zinc-500 text-lg">Gestioná tu obra, biografía y ventas desde aquí.</p>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/admin/content" className="bg-zinc-900 border border-zinc-800 px-4 py-3 rounded-xl text-xs uppercase tracking-[0.2em] text-zinc-300 hover:bg-zinc-800 transition-colors">
+              CMS Sitio
+            </Link>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-bold">{user.displayName}</p>
               <p className="text-xs text-zinc-600">{user.email}</p>
@@ -374,6 +415,12 @@ export default function AdminPage() {
 
                      <div className="mt-auto grid grid-cols-2 gap-2">
                        <button
+                         onClick={() => openEditModal(art)}
+                         className="py-2 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                       >
+                         Editar
+                       </button>
+                       <button
                          onClick={() => updateArtworkStatus(art, 'available')}
                          className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
                            art.status === 'available'
@@ -424,6 +471,63 @@ export default function AdminPage() {
 
         </main>
       </div>
+
+      {editingArtwork && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setEditingArtwork(null)}>
+          <div className="w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-6 text-2xl font-bold text-white">Editar obra</h3>
+
+            <div className="space-y-4">
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Título"
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+              />
+              <input
+                value={editPrice}
+                onChange={(e) => setEditPrice(e.target.value)}
+                type="number"
+                placeholder="Precio"
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+              />
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={5}
+                placeholder="Descripción"
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+              />
+
+              <select
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as "available" | "reserved" | "sold")}
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+              >
+                <option value="available">Disponible</option>
+                <option value="reserved">Reservada</option>
+                <option value="sold">Vendida</option>
+              </select>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setEditingArtwork(null)}
+                className="rounded-xl border border-zinc-700 px-4 py-2 text-zinc-300"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveArtworkEdits}
+                disabled={savingEdit}
+                className="rounded-xl bg-white px-4 py-2 font-bold text-black disabled:opacity-60"
+              >
+                {savingEdit ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
