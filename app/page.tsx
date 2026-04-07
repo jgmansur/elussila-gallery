@@ -14,16 +14,16 @@ type Artwork = {
   price: string;
   description: string;
   category: string;
-  status: "available" | "sold";
+  status: "available" | "reserved" | "sold";
 };
 
 export default function Home() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("Todas");
 
-  const categories = ["All", "Pintura", "Escultura", "Joyería", "Digital"];
+  const categories = ["Todas", "Pintura"];
 
   useEffect(() => {
     // Escuchar cambios en la colección 'artworks'
@@ -39,7 +39,7 @@ export default function Home() {
           title: data.title || "Untitled",
           price: data.price || "",
           description: data.description || "",
-          category: data.category || "General",
+          category: data.category || "Pintura",
           status: data.status || "available",
         } as Artwork;
       });
@@ -50,8 +50,14 @@ export default function Home() {
     return () => unsubscribe();
   }, []);
 
-  const openWhatsApp = (artwork: Artwork) => {
-    const message = `Hola Elussila! Me gustaría consultar por la pieza "${artwork.title}". ¿Sigue disponible?`;
+  const openWhatsApp = (artwork: Artwork, action: "reserve" | "purchase" | "waitlist" = "reserve") => {
+    const messageByAction = {
+      reserve: `Hola Elussila! Me gustaría reservar o consultar por la pieza "${artwork.title}". ¿Sigue disponible?`,
+      purchase: `Hola Elussila! Quiero comprar la pieza "${artwork.title}". ¿Me compartís los pasos para pago y envío?`,
+      waitlist: `Hola Elussila! Vi que la pieza "${artwork.title}" está reservada. ¿Puedo quedar en lista de espera?`,
+    };
+
+    const message = messageByAction[action];
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/5491136531320?text=${encodedMessage}`, "_blank");
   };
@@ -66,7 +72,7 @@ export default function Home() {
     }).format(price);
   };
 
-  const filteredArtworks = selectedCategory === "All" 
+  const filteredArtworks = selectedCategory === "Todas" 
     ? artworks 
     : artworks.filter(a => a.category === selectedCategory);
 
@@ -125,7 +131,8 @@ export default function Home() {
         ) : (
           filteredArtworks.map((artwork) => {
             const paddingPercentage = (artwork.height / artwork.width) * 100;
-            const isSold = artwork.status === "sold";
+             const isSold = artwork.status === "sold";
+             const isReserved = artwork.status === "reserved";
 
             return (
               <div
@@ -157,11 +164,16 @@ export default function Home() {
                       </h3>
                       <div className="pt-2 flex items-center justify-between">
                         <span className="text-sm font-medium text-white/90 tabular-nums">
-                          {isSold ? "Sold Out" : formatPrice(artwork.price)}
+                          {isSold ? "Vendida" : formatPrice(artwork.price)}
                         </span>
-                        {!isSold && (
+                        {!isSold && !isReserved && (
                           <span className="text-[9px] uppercase tracking-wider text-zinc-500 border border-zinc-800 px-2 py-0.5 rounded-full">
-                            Available
+                            Disponible
+                          </span>
+                        )}
+                        {isReserved && (
+                          <span className="text-[9px] uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                            Reservada
                           </span>
                         )}
                       </div>
@@ -173,19 +185,6 @@ export default function Home() {
           })
         )}
       </section>
-
-      <footer className="relative mt-12 py-16 px-4 border-t border-zinc-900 text-center">
-        <div className="max-w-xl mx-auto space-y-4">
-          <p className="text-zinc-500 font-light text-sm tracking-wide">
-            © {new Date().getFullYear()} Elussila Gallery. All artworks are original creations.
-          </p>
-          <div className="flex justify-center space-x-6">
-            <a href="#" className="text-zinc-600 hover:text-white transition-colors text-xs uppercase tracking-widest">Instagram</a>
-            <a href="#" className="text-zinc-600 hover:text-white transition-colors text-xs uppercase tracking-widest">About</a>
-            <a href="/admin" className="text-zinc-600 hover:text-white transition-colors text-xs uppercase tracking-widest">Panel</a>
-          </div>
-        </div>
-      </footer>
 
       {/* Side Panel / Detail Modal */}
       {selectedArtwork && (
@@ -242,33 +241,57 @@ export default function Home() {
                   <div className="h-px w-12 bg-zinc-800" />
                   
                   <div className="flex items-baseline space-x-4">
-                    <span className="text-3xl font-serif text-white/90">
-                      {selectedArtwork.status === "sold" ? "Sold Out" : formatPrice(selectedArtwork.price)}
-                    </span>
-                    {selectedArtwork.status === "available" && (
-                      <span className="text-[10px] uppercase tracking-widest text-zinc-600 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full">
-                        In Stock
-                      </span>
-                    )}
-                  </div>
-                </div>
+                     <span className="text-3xl font-serif text-white/90">
+                       {selectedArtwork.status === "sold"
+                         ? "Vendida"
+                         : selectedArtwork.status === "reserved"
+                           ? "Reservada"
+                           : formatPrice(selectedArtwork.price)}
+                     </span>
+                     {selectedArtwork.status === "available" && (
+                       <span className="text-[10px] uppercase tracking-widest text-zinc-600 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full">
+                         Disponible
+                       </span>
+                     )}
+                     {selectedArtwork.status === "reserved" && (
+                       <span className="text-[10px] uppercase tracking-widest text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+                         En reserva
+                       </span>
+                     )}
+                   </div>
+                 </div>
 
-                <div className="pt-8 space-y-4">
-                  {selectedArtwork.status === "available" ? (
-                    <button 
-                      onClick={() => openWhatsApp(selectedArtwork)}
-                      className="w-full bg-white text-black py-5 px-8 rounded-sm text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-200 transition-all duration-300 transform active:scale-[0.98] shadow-lg hover:shadow-white/10"
-                    >
-                      Inquire / Purchase
-                    </button>
-                  ) : (
-                    <button 
-                      disabled
-                      className="w-full bg-zinc-900 text-zinc-600 py-5 px-8 rounded-sm text-xs uppercase tracking-[0.2em] font-bold cursor-not-allowed border border-zinc-800"
-                    >
-                      Sold Out
-                    </button>
-                  )}
+                 <div className="pt-8 space-y-4">
+                   {selectedArtwork.status === "available" ? (
+                     <>
+                       <button
+                         onClick={() => openWhatsApp(selectedArtwork, "reserve")}
+                         className="w-full bg-white text-black py-5 px-8 rounded-sm text-xs uppercase tracking-[0.2em] font-bold hover:bg-zinc-200 transition-all duration-300 transform active:scale-[0.98] shadow-lg hover:shadow-white/10"
+                       >
+                         Reservar / Consultar
+                       </button>
+                       <button
+                         onClick={() => openWhatsApp(selectedArtwork, "purchase")}
+                         className="w-full bg-zinc-900 text-white py-5 px-8 rounded-sm text-xs uppercase tracking-[0.2em] font-bold border border-zinc-700 hover:border-zinc-500 transition-all duration-300 transform active:scale-[0.98]"
+                       >
+                         Comprar ahora
+                       </button>
+                     </>
+                   ) : selectedArtwork.status === "reserved" ? (
+                     <button
+                       onClick={() => openWhatsApp(selectedArtwork, "waitlist")}
+                       className="w-full bg-amber-500/10 text-amber-300 py-5 px-8 rounded-sm text-xs uppercase tracking-[0.2em] font-bold border border-amber-500/20 hover:bg-amber-500/20 transition-all duration-300"
+                     >
+                       Quiero lista de espera
+                     </button>
+                   ) : (
+                     <button 
+                       disabled
+                       className="w-full bg-zinc-900 text-zinc-600 py-5 px-8 rounded-sm text-xs uppercase tracking-[0.2em] font-bold cursor-not-allowed border border-zinc-800"
+                     >
+                       Vendida
+                     </button>
+                   )}
                   
                   <p className="text-center text-[10px] text-zinc-600 tracking-wider">
                     Certificate of Authenticity Included

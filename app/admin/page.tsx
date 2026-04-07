@@ -19,13 +19,13 @@ export default function AdminPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Pintura");
   const [file, setFile] = useState<File | null>(null);
   
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [artworks, setArtworks] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const category = "Pintura";
 
   useEffect(() => {
     const unsubApp = onAuthStateChanged(auth, (u) => {
@@ -127,12 +127,10 @@ export default function AdminPage() {
     }
   };
 
-  const toggleSoldStatus = async (artwork: any) => {
+  const updateArtworkStatus = async (artwork: any, status: "available" | "reserved" | "sold") => {
     try {
       const artRef = doc(db, "artworks", artwork.id);
-      await updateDoc(artRef, {
-        status: artwork.status === "available" ? "sold" : "available"
-      });
+      await updateDoc(artRef, { status });
     } catch (e) {
       console.error(e);
       alert("Error actualizando estado.");
@@ -245,31 +243,24 @@ export default function AdminPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Precio (MXN)</label>
-                    <input 
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Precio (MXN)</label>
+                     <input 
                       type="number" 
                       value={price}
                       onChange={(e) => setPrice(e.target.value)}
                       placeholder="0.00"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Categoría</label>
-                    <select 
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors appearance-none"
-                    >
-                      <option>Pintura</option>
-                      <option>Escultura</option>
-                      <option>Joyería</option>
-                      <option>Digital</option>
-                    </select>
-                  </div>
-                </div>
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Categoría</label>
+                     <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-zinc-300">
+                       Pintura
+                     </div>
+                   </div>
+                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Descripción</label>
@@ -362,15 +353,17 @@ export default function AdminPage() {
                       className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${art.status === 'sold' ? 'grayscale opacity-50' : ''}`}
                     />
                     <div className="absolute top-4 left-4">
-                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
-                        art.status === 'available' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                        : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                      }`}>
-                        {art.status === 'available' ? 'Disponible' : 'Vendido'}
-                      </span>
-                    </div>
-                  </div>
+                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
+                         art.status === 'available'
+                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                           : art.status === 'reserved'
+                             ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                             : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
+                       }`}>
+                         {art.status === 'available' ? 'Disponible' : art.status === 'reserved' ? 'Reservada' : 'Vendida'}
+                       </span>
+                     </div>
+                   </div>
                   
                   <div className="p-6 flex flex-col flex-1">
                     <div className="mb-4">
@@ -379,23 +372,43 @@ export default function AdminPage() {
                       <p className="text-sm text-zinc-400 font-mono">${art.price}</p>
                     </div>
 
-                    <div className="mt-auto grid grid-cols-2 gap-3">
-                      <button 
-                        onClick={() => toggleSoldStatus(art)}
-                        className={`py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                          art.status === 'available'
-                          ? 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-white'
-                          : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
-                        }`}
-                      >
-                        {art.status === 'available' ? 'Marcar Vendido' : 'Marcar Disp.'}
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(art)}
-                        className="py-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/20 transition-all"
-                      >
-                        Eliminar
-                      </button>
+                     <div className="mt-auto grid grid-cols-2 gap-2">
+                       <button
+                         onClick={() => updateArtworkStatus(art, 'available')}
+                         className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                           art.status === 'available'
+                             ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                             : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                         }`}
+                       >
+                         Disponible
+                       </button>
+                       <button
+                         onClick={() => updateArtworkStatus(art, 'reserved')}
+                         className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                           art.status === 'reserved'
+                             ? 'bg-amber-500/20 border-amber-400/40 text-amber-200'
+                             : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                         }`}
+                       >
+                         Reservada
+                       </button>
+                       <button
+                         onClick={() => updateArtworkStatus(art, 'sold')}
+                         className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                           art.status === 'sold'
+                             ? 'bg-zinc-700/40 border-zinc-500/50 text-zinc-200'
+                             : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                         }`}
+                       >
+                         Vendida
+                       </button>
+                       <button 
+                         onClick={() => handleDelete(art)}
+                         className="py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                       >
+                         Eliminar
+                       </button>
                     </div>
                   </div>
                 </div>

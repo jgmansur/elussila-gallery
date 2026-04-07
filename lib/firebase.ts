@@ -3,13 +3,21 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAZtWRuTkH15uGh1usCGuIOedfoz9DjNR8",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "elussila-gallery-2026.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "elussila-gallery-2026",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "elussila-gallery-2026.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "249350145101",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:249350145101:web:8bc8548910264df463c804"
+  apiKey: requireEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
+  authDomain: requireEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
+  projectId: requireEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+  storageBucket: requireEnv("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+  messagingSenderId: requireEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+  appId: requireEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
 };
 
 // Initialize Firebase only once
