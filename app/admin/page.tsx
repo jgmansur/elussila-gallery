@@ -102,30 +102,36 @@ export default function AdminPage() {
           setUploading(false);
         },
         async () => {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Guardamos como OBRA completa
-          await addDoc(collection(db, "artworks"), {
-            title,
-            price: Number(price),
-            description,
-            category,
-            url: downloadUrl,
-            storagePath: `artworks/${fileName}`,
-            width,
-            height,
-            status: "available",
-            createdAt: serverTimestamp()
-          });
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
 
-          // Reset Form
-          setTitle("");
-          setPrice("");
-          setDescription("");
-          setFile(null);
-          setUploading(false);
-          setProgress(0);
-          alert("¡Obra publicada exitosamente!");
+            // Guardamos como OBRA completa
+            await addDoc(collection(db, "artworks"), {
+              title,
+              price: Number(price),
+              description,
+              category,
+              url: downloadUrl,
+              storagePath: `artworks/${fileName}`,
+              width,
+              height,
+              status: "available",
+              createdAt: serverTimestamp()
+            });
+
+            // Reset Form
+            setTitle("");
+            setPrice("");
+            setDescription("");
+            setFile(null);
+            setProgress(0);
+            alert("¡Obra publicada exitosamente!");
+          } catch (error) {
+            console.error("Error guardando obra en Firestore", error);
+            alert("La imagen subió, pero no se pudo guardar la obra. Revisá permisos de Firestore/Storage para tu email.");
+          } finally {
+            setUploading(false);
+          }
         }
       );
     } catch (e) {
