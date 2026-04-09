@@ -45,6 +45,7 @@ export default function AdminPage() {
   const [editCollections, setEditCollections] = useState<string[]>([]);
   const [editCollectionDraft, setEditCollectionDraft] = useState("");
   const [editRemovedGalleryIndexes, setEditRemovedGalleryIndexes] = useState<number[]>([]);
+  const [editGalleryThumbFallbackByIndex, setEditGalleryThumbFallbackByIndex] = useState<Record<number, number>>({});
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editAdditionalFiles, setEditAdditionalFiles] = useState<File[]>([]);
@@ -283,6 +284,7 @@ export default function AdminPage() {
   const closeEditModal = () => {
     setEditingArtwork(null);
     setEditRemovedGalleryIndexes([]);
+    setEditGalleryThumbFallbackByIndex({});
     resetEditImageState();
     clearCropperState();
   };
@@ -629,6 +631,22 @@ export default function AdminPage() {
     }));
   };
 
+  const getEditingThumbCandidates = (photo: { url: string; driveFileId: string }) => {
+    const candidates: string[] = [];
+
+    if (photo.driveFileId) {
+      candidates.push(`https://lh3.googleusercontent.com/d/${photo.driveFileId}=w1200`);
+      candidates.push(`https://drive.google.com/thumbnail?id=${photo.driveFileId}&sz=w1200`);
+      candidates.push(`https://drive.google.com/uc?export=view&id=${photo.driveFileId}`);
+    }
+
+    if (photo.url) {
+      candidates.push(photo.url);
+    }
+
+    return Array.from(new Set(candidates.filter(Boolean)));
+  };
+
   const openEditModal = (artwork: any) => {
     setEditingArtwork(artwork);
     setEditTitle(artwork.title || "");
@@ -640,6 +658,7 @@ export default function AdminPage() {
     setEditCollections(parseCollections(artwork.collections));
     setEditCollectionDraft("");
     setEditRemovedGalleryIndexes([]);
+    setEditGalleryThumbFallbackByIndex({});
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -1477,12 +1496,29 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     {getEditingGalleryItems(editingArtwork).map((photo) => {
                       const marked = editRemovedGalleryIndexes.includes(photo.index);
+                      const thumbCandidates = getEditingThumbCandidates(photo);
+                      const fallbackIndex = editGalleryThumbFallbackByIndex[photo.index] ?? 0;
+                      const thumbUrl = thumbCandidates[fallbackIndex] || thumbCandidates[0] || "";
 
                       return (
                         <div key={`existing-photo-${photo.index}`} className="space-y-2">
                           <div className={`relative overflow-hidden rounded-xl border ${marked ? "border-red-400/40 opacity-50" : "border-zinc-800"}`}>
-                            {photo.url ? (
-                              <img src={photo.url} alt={`Foto ${photo.index + 1}`} className="h-28 w-full object-cover" />
+                            {thumbUrl ? (
+                              <img
+                                src={thumbUrl}
+                                alt={`Foto ${photo.index + 1}`}
+                                className="h-28 w-full object-cover"
+                                onError={() => {
+                                  setEditGalleryThumbFallbackByIndex((prev) => {
+                                    const current = prev[photo.index] ?? 0;
+                                    if (current >= thumbCandidates.length - 1) return prev;
+                                    return {
+                                      ...prev,
+                                      [photo.index]: current + 1,
+                                    };
+                                  });
+                                }}
+                              />
                             ) : (
                               <div className="flex h-28 items-center justify-center bg-zinc-950 text-[10px] text-zinc-600">Sin URL</div>
                             )}
