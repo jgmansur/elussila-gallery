@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { defaultSiteContent } from "@/lib/site-content";
 
 type Artwork = {
   id: string;
@@ -77,6 +78,7 @@ export default function Home() {
   const [selectedCollection, setSelectedCollection] = useState(initialFilters.collection);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [imageFallbackById, setImageFallbackById] = useState<Record<string, ImageFallbackState>>({});
+  const [contactWhatsapp, setContactWhatsapp] = useState(defaultSiteContent.contactWhatsapp);
 
   const categories = [...CATEGORY_OPTIONS];
 
@@ -163,7 +165,18 @@ export default function Home() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, "siteContent", "main"), (snapshot) => {
+      const data = snapshot.data();
+      const fromCms = String(data?.contactWhatsapp || "").trim();
+      setContactWhatsapp(fromCms || defaultSiteContent.contactWhatsapp);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const openWhatsApp = (artwork: Artwork, action: "reserve" | "purchase" | "waitlist" = "reserve") => {
+    const normalizedWhatsapp = String(contactWhatsapp || defaultSiteContent.contactWhatsapp).replace(/\D/g, "");
     const reference = artwork.itemId ? ` (ID: ${artwork.itemId})` : "";
     const messageByAction = {
       reserve: `Hola Elussila! Me gustaría reservar o consultar por la pieza "${artwork.title}"${reference}. ¿Sigue disponible?`,
@@ -173,7 +186,7 @@ export default function Home() {
 
     const message = messageByAction[action];
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/528343537539?text=${encodedMessage}`, "_blank");
+    window.open(`https://wa.me/${normalizedWhatsapp}?text=${encodedMessage}`, "_blank");
   };
 
   const formatPrice = (price: any) => {
