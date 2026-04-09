@@ -19,6 +19,7 @@ type Artwork = {
   dimensions?: string;
   collections?: string[];
   featured?: boolean;
+  galleryUrls?: string[];
   status: "available" | "reserved" | "sold";
   provider?: "drive" | "firebase" | string;
   driveFileId?: string;
@@ -67,10 +68,12 @@ export default function Home() {
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState(initialFilters.category);
   const [pinturaView, setPinturaView] = useState<GalleryView>(initialFilters.view);
   const [clientSearch, setClientSearch] = useState(initialFilters.query);
   const [selectedCollection, setSelectedCollection] = useState(initialFilters.collection);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [imageFallbackById, setImageFallbackById] = useState<Record<string, ImageFallbackState>>({});
 
   const categories = [...CATEGORY_OPTIONS];
@@ -97,6 +100,13 @@ export default function Home() {
     }
 
     return normalized;
+  };
+
+  const parseStringArray = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
   };
 
   const shuffleArtworks = (items: Artwork[]) => {
@@ -128,6 +138,7 @@ export default function Home() {
           dimensions: data.dimensions || "",
           collections: parseCollections(data.collections),
           featured: Boolean(data.featured),
+          galleryUrls: parseStringArray(data.galleryUrls),
           status: data.status || "available",
           provider: data.provider,
           driveFileId: data.driveFileId,
@@ -210,6 +221,28 @@ export default function Home() {
   const isCollectionsView = selectedCategory === "Pintura" && pinturaView === "collections";
   const artworksToRender = isCollectionsView ? artworksWithCollections : searchFilteredArtworks;
 
+  const getArtworkImages = (artwork: Artwork) => {
+    const gallery = parseStringArray(artwork.galleryUrls);
+    const fallbackMain = artwork.url ? [artwork.url] : [];
+    const merged = gallery.length > 0 ? gallery : fallbackMain;
+
+    const unique = new Set<string>();
+    const normalized: string[] = [];
+    for (const url of merged) {
+      if (!url || unique.has(url)) continue;
+      unique.add(url);
+      normalized.push(url);
+    }
+
+    return normalized;
+  };
+
+  const getPrimaryImageUrl = (artwork: Artwork) => {
+    const images = getArtworkImages(artwork);
+    if (images.length > 0) return images[0];
+    return resolveImageUrl(artwork);
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -273,12 +306,15 @@ export default function Home() {
     const paddingPercentage = (artwork.height / artwork.width) * 100;
     const isSold = artwork.status === "sold";
     const isReserved = artwork.status === "reserved";
-    const imageUrl = resolveImageUrl(artwork);
+    const imageUrl = getPrimaryImageUrl(artwork);
 
     return (
       <div
         key={cardKey || artwork.id}
-        onClick={() => setSelectedArtwork(artwork)}
+        onClick={() => {
+          setSelectedArtwork(artwork);
+          setSelectedImageIndex(0);
+        }}
         className="masonry-item mb-6 group relative bg-zinc-900/50 border border-transparent hover:border-zinc-800 transition-all duration-700 cursor-pointer overflow-hidden rounded-sm shadow-2xl shadow-black/50"
       >
         <div
@@ -339,6 +375,22 @@ export default function Home() {
         </div>
       </div>
     );
+  };
+
+  const selectedArtworkImages = selectedArtwork
+    ? (getArtworkImages(selectedArtwork).length > 0 ? getArtworkImages(selectedArtwork) : [resolveImageUrl(selectedArtwork)])
+    : [];
+
+  const activeSelectedImage = selectedArtworkImages[selectedImageIndex] || selectedArtworkImages[0] || "";
+
+  const goToPrevImage = () => {
+    if (selectedArtworkImages.length <= 1) return;
+    setSelectedImageIndex((prev) => (prev - 1 + selectedArtworkImages.length) % selectedArtworkImages.length);
+  };
+
+  const goToNextImage = () => {
+    if (selectedArtworkImages.length <= 1) return;
+    setSelectedImageIndex((prev) => (prev + 1) % selectedArtworkImages.length);
   };
 
   return (
@@ -515,12 +567,18 @@ export default function Home() {
       {selectedArtwork && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-end bg-black/80 backdrop-blur-md transition-all duration-500 group/modal"
-          onClick={() => setSelectedArtwork(null)}
+          onClick={() => {
+            setSelectedArtwork(null);
+            setSelectedImageIndex(0);
+          }}
         >
           {/* Close Area */}
           <button 
             className="absolute top-8 left-8 text-white/30 hover:text-white transition-colors group z-50"
-            onClick={() => setSelectedArtwork(null)}
+            onClick={() => {
+              setSelectedArtwork(null);
+              setSelectedImageIndex(0);
+            }}
           >
             <div className="flex items-center space-x-3">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -532,33 +590,68 @@ export default function Home() {
 
           {/* Panel content */}
           <div 
-            className="h-full w-full max-w-[96vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700"
+            className="h-full w-full max-w-[99vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image Viewer Section */}
-            <div className="relative overflow-hidden bg-black flex items-center justify-center group/viewer md:flex-[1.65]">
-              {selectedArtwork.provider === "drive" ? (
-                <img
-                  src={resolveImageUrl(selectedArtwork)}
-                  alt={selectedArtwork.title}
-                  className="h-full w-full object-contain p-3 md:p-6 lg:p-8 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
-                  loading="eager"
-                  onError={() => advanceImageFallback(selectedArtwork)}
-                />
-              ) : (
-                <Image
-                  src={resolveImageUrl(selectedArtwork)}
-                  alt={selectedArtwork.title}
-                  fill
-                  className="object-contain p-3 md:p-6 lg:p-8 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
-                  priority
-                  onError={() => advanceImageFallback(selectedArtwork)}
-                />
+            <div
+              className="relative overflow-hidden bg-black flex items-center justify-center group/viewer md:flex-[2.2]"
+              onTouchStart={(e) => setTouchStartX(e.touches[0]?.clientX ?? null)}
+              onTouchEnd={(e) => {
+                if (touchStartX === null) return;
+                const endX = e.changedTouches[0]?.clientX ?? touchStartX;
+                const delta = endX - touchStartX;
+                if (delta > 40) goToPrevImage();
+                if (delta < -40) goToNextImage();
+                setTouchStartX(null);
+              }}
+            >
+              {selectedArtworkImages.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={goToPrevImage}
+                    className="absolute left-3 z-20 rounded-full border border-zinc-700/80 bg-black/50 px-3 py-2 text-white hover:bg-black/70"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={goToNextImage}
+                    className="absolute right-3 z-20 rounded-full border border-zinc-700/80 bg-black/50 px-3 py-2 text-white hover:bg-black/70"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
+
+              <img
+                src={activeSelectedImage}
+                alt={`${selectedArtwork.title} ${selectedImageIndex + 1}`}
+                className="h-full w-full object-contain p-1 md:p-2 transition-transform duration-700 group-hover/viewer:scale-[1.01]"
+                loading="eager"
+              />
+
+              {selectedArtworkImages.length > 1 && (
+                <div className="absolute bottom-3 left-0 right-0 z-20 px-3">
+                  <div className="mx-auto flex max-w-full gap-2 overflow-x-auto rounded-full bg-black/40 p-2">
+                    {selectedArtworkImages.map((imageUrl, index) => (
+                      <button
+                        key={`${selectedArtwork.id}-thumb-${index}`}
+                        type="button"
+                        onClick={() => setSelectedImageIndex(index)}
+                        className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-md border ${selectedImageIndex === index ? "border-white" : "border-zinc-700"}`}
+                      >
+                        <img src={imageUrl} alt={`Miniatura ${index + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
             {/* Info Section */}
-            <div className="w-full md:w-[390px] p-8 md:p-12 flex flex-col justify-center bg-[#0a0a0a] border-l border-zinc-900 shadow-2xl">
+            <div className="w-full md:w-[340px] p-8 md:p-10 flex flex-col justify-center bg-[#0a0a0a] border-l border-zinc-900 shadow-2xl">
               <div className="space-y-12">
                 <header className="space-y-4">
                   <p className="text-[10px] uppercase tracking-[0.3em] font-semibold text-zinc-500">

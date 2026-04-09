@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [collections, setCollections] = useState<string[]>([]);
   const [collectionDraft, setCollectionDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
   
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -45,6 +46,7 @@ export default function AdminPage() {
   const [editCollectionDraft, setEditCollectionDraft] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editAdditionalFiles, setEditAdditionalFiles] = useState<File[]>([]);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
   const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
   const [cropperOpen, setCropperOpen] = useState(false);
@@ -56,7 +58,9 @@ export default function AdminPage() {
   const [searchCategory, setSearchCategory] = useState("all");
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const additionalFilesInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editAdditionalFilesInputRef = useRef<HTMLInputElement>(null);
   const category = "Pintura";
 
   const createDriveProvider = () => {
@@ -149,6 +153,11 @@ export default function AdminPage() {
   };
 
   const resolveImageCandidates = (artwork: any) => {
+    const galleryUrls = parseStringArray(artwork?.galleryUrls);
+    if (galleryUrls.length > 0) {
+      return galleryUrls;
+    }
+
     if (artwork?.provider === "drive" && artwork?.driveFileId) {
       return [
         `https://lh3.googleusercontent.com/d/${artwork.driveFileId}=w1200`,
@@ -196,6 +205,7 @@ export default function AdminPage() {
       URL.revokeObjectURL(editImagePreviewUrl);
     }
     setEditImageFile(null);
+    setEditAdditionalFiles([]);
     setEditImagePreviewUrl(null);
     setRemoveCurrentImage(false);
   };
@@ -269,6 +279,29 @@ export default function AdminPage() {
     if (!cropperOriginalFile) return;
     applyFileToTarget(cropperOriginalFile, cropperTarget);
     clearCropperState();
+  };
+
+  const appendAdditionalFiles = (
+    selectedFiles: FileList | null,
+    setter: React.Dispatch<React.SetStateAction<File[]>>
+  ) => {
+    if (!selectedFiles || selectedFiles.length === 0) return;
+
+    const incoming = Array.from(selectedFiles).filter((fileItem) => fileItem.type.startsWith("image/"));
+    if (incoming.length === 0) return;
+
+    setter((prev) => {
+      const byKey = new Map<string, File>();
+
+      for (const fileItem of [...prev, ...incoming]) {
+        const key = `${fileItem.name}-${fileItem.size}-${fileItem.lastModified}`;
+        if (!byKey.has(key)) {
+          byKey.set(key, fileItem);
+        }
+      }
+
+      return Array.from(byKey.values());
+    });
   };
 
   useEffect(() => {
@@ -350,6 +383,13 @@ export default function AdminPage() {
     }
 
     return normalized;
+  };
+
+  const parseStringArray = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
   };
 
   const addCollectionTag = (
@@ -448,6 +488,16 @@ export default function AdminPage() {
       const uploaded = await uploadImageToDrive(file, token);
       setProgress(75);
 
+      const galleryUrls: string[] = [uploaded.url];
+      const galleryDriveFileIds: string[] = [uploaded.fileId];
+
+      for (let i = 0; i < additionalFiles.length; i += 1) {
+        const extraUploaded = await uploadImageToDrive(additionalFiles[i], token);
+        galleryUrls.push(extraUploaded.url);
+        galleryDriveFileIds.push(extraUploaded.fileId);
+      }
+      setProgress(90);
+
       await addDoc(collection(db, "artworks"), {
         title,
         price: Number(price),
@@ -460,6 +510,8 @@ export default function AdminPage() {
         category,
         url: uploaded.url,
         driveFileId: uploaded.fileId,
+        galleryUrls,
+        galleryDriveFileIds,
         provider: "drive",
         width,
         height,
@@ -477,6 +529,7 @@ export default function AdminPage() {
       setCollections([]);
       setCollectionDraft("");
       setFile(null);
+      setAdditionalFiles([]);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
       console.error(e);
@@ -501,10 +554,16 @@ export default function AdminPage() {
     if (!confirm("¿Estás seguro de eliminar esta obra? Esta acción no se puede deshacer.")) return;
     
     try {
-      if (artwork.driveFileId) {
-        await deleteImageFromDrive(artwork.driveFileId);
+      const driveIds = new Set<string>([
+        ...parseStringArray(artwork.galleryDriveFileIds),
+        String(artwork.driveFileId || "").trim(),
+      ].filter(Boolean));
+
+      if (driveIds.size > 0) {
+        for (const driveId of driveIds) {
+          await deleteImageFromDrive(driveId);
+        }
       }
-      // Compatibilidad con obras antiguas en Firebase Storage
       else if (artwork.storagePath) {
         const fileRef = ref(storage, artwork.storagePath);
         await deleteObject(fileRef);
@@ -540,6 +599,16 @@ export default function AdminPage() {
 
     setSavingEdit(true);
     try {
+      let nextGalleryUrls = parseStringArray(editingArtwork.galleryUrls);
+      let nextGalleryDriveFileIds = parseStringArray(editingArtwork.galleryDriveFileIds);
+
+      if (nextGalleryUrls.length === 0 && editingArtwork.url) {
+        nextGalleryUrls = [String(editingArtwork.url)];
+      }
+      if (nextGalleryDriveFileIds.length === 0 && editingArtwork.driveFileId) {
+        nextGalleryDriveFileIds = [String(editingArtwork.driveFileId)];
+      }
+
       const updates: Record<string, any> = {
         title: editTitle.trim(),
         price: Number(editPrice),
@@ -558,6 +627,11 @@ export default function AdminPage() {
         const token = await getDriveAccessToken();
         const uploaded = await uploadImageToDrive(editImageFile, token);
 
+        const tailUrls = nextGalleryUrls.length > 0 ? nextGalleryUrls.slice(1) : [];
+        const tailDriveIds = nextGalleryDriveFileIds.length > 0 ? nextGalleryDriveFileIds.slice(1) : [];
+        nextGalleryUrls = [uploaded.url, ...tailUrls];
+        nextGalleryDriveFileIds = [uploaded.fileId, ...tailDriveIds];
+
         updates.url = uploaded.url;
         updates.driveFileId = uploaded.fileId;
         updates.provider = "drive";
@@ -571,15 +645,36 @@ export default function AdminPage() {
         updates.provider = deleteField();
         updates.width = deleteField();
         updates.height = deleteField();
+        nextGalleryUrls = [];
+        nextGalleryDriveFileIds = [];
       }
+
+      if (editAdditionalFiles.length > 0) {
+        const token = await getDriveAccessToken();
+        for (let i = 0; i < editAdditionalFiles.length; i += 1) {
+          const uploadedExtra = await uploadImageToDrive(editAdditionalFiles[i], token);
+          nextGalleryUrls.push(uploadedExtra.url);
+          nextGalleryDriveFileIds.push(uploadedExtra.fileId);
+        }
+      }
+
+      updates.galleryUrls = nextGalleryUrls;
+      updates.galleryDriveFileIds = nextGalleryDriveFileIds;
 
       await updateDoc(doc(db, "artworks", editingArtwork.id), updates);
 
-      const shouldDeletePreviousAsset = Boolean(editImageFile || removeCurrentImage);
-      if (shouldDeletePreviousAsset) {
+      if (editImageFile || removeCurrentImage) {
         try {
-          if (editingArtwork.driveFileId) {
-            await deleteImageFromDrive(editingArtwork.driveFileId);
+          if (removeCurrentImage) {
+            const idsToDelete = new Set<string>([
+              ...parseStringArray(editingArtwork.galleryDriveFileIds),
+              String(editingArtwork.driveFileId || "").trim(),
+            ].filter(Boolean));
+            for (const id of idsToDelete) {
+              await deleteImageFromDrive(id);
+            }
+          } else if (editImageFile && editingArtwork.driveFileId) {
+            await deleteImageFromDrive(String(editingArtwork.driveFileId));
           } else if (editingArtwork.storagePath) {
             const previousFileRef = ref(storage, editingArtwork.storagePath);
             await deleteObject(previousFileRef);
@@ -853,6 +948,47 @@ export default function AdminPage() {
                     placeholder="Contá la historia detrás de esta pieza..."
                     rows={4}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors resize-none"
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Fotos adicionales (opcional)</p>
+                  <button
+                    type="button"
+                    onClick={() => additionalFilesInputRef.current?.click()}
+                    className="rounded-xl border border-zinc-700 px-4 py-2 text-xs uppercase tracking-widest text-zinc-300"
+                  >
+                    Seleccionar fotos
+                  </button>
+                  {additionalFiles.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-zinc-400">{additionalFiles.length} foto(s) extra seleccionadas</p>
+                      <div className="flex flex-wrap gap-2">
+                        {additionalFiles.map((fileItem) => (
+                          <span key={`${fileItem.name}-${fileItem.size}-${fileItem.lastModified}`} className="rounded-full border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400">
+                            {fileItem.name}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAdditionalFiles([])}
+                        className="text-xs text-red-300"
+                      >
+                        Limpiar selección
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    ref={additionalFilesInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      appendAdditionalFiles(e.target.files, setAdditionalFiles);
+                      e.currentTarget.value = "";
+                    }}
                   />
                 </div>
               </div>
@@ -1212,6 +1348,47 @@ export default function AdminPage() {
                 <option value="reserved">Reservada</option>
                 <option value="sold">Vendida</option>
               </select>
+
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+                <p className="text-xs uppercase tracking-widest text-zinc-400">Fotos adicionales</p>
+                <button
+                  type="button"
+                  onClick={() => editAdditionalFilesInputRef.current?.click()}
+                  className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
+                >
+                  Agregar fotos al carrusel
+                </button>
+                {editAdditionalFiles.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-zinc-400">{editAdditionalFiles.length} foto(s) nuevas listas para agregar</p>
+                    <div className="flex flex-wrap gap-2">
+                      {editAdditionalFiles.map((fileItem) => (
+                        <span key={`${fileItem.name}-${fileItem.size}-${fileItem.lastModified}`} className="rounded-full border border-zinc-700 px-2 py-1 text-[10px] text-zinc-400">
+                          {fileItem.name}
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditAdditionalFiles([])}
+                      className="text-xs text-red-300"
+                    >
+                      Limpiar selección
+                    </button>
+                  </div>
+                )}
+                <input
+                  ref={editAdditionalFilesInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    appendAdditionalFiles(e.target.files, setEditAdditionalFiles);
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </div>
 
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
                 <p className="text-xs uppercase tracking-widest text-zinc-400">Imagen de la obra</p>
