@@ -30,12 +30,21 @@ type ImageFallbackState = {
 };
 
 const CATEGORY_OPTIONS = ["Todas", "Pintura"] as const;
+type CategoryOption = (typeof CATEGORY_OPTIONS)[number];
+type GalleryView = "artworks" | "collections";
 
-const getInitialRouteFilters = () => {
+type InitialRouteFilters = {
+  category: CategoryOption;
+  view: GalleryView;
+  query: string;
+  collection: string;
+};
+
+const getInitialRouteFilters = (): InitialRouteFilters => {
   if (typeof window === "undefined") {
     return {
       category: "Todas",
-      view: "artworks" as "artworks" | "collections",
+      view: "artworks",
       query: "",
       collection: "all",
     };
@@ -46,7 +55,7 @@ const getInitialRouteFilters = () => {
   const view = params.get("view");
 
   return {
-    category: category && CATEGORY_OPTIONS.includes(category as (typeof CATEGORY_OPTIONS)[number]) ? category : "Todas",
+    category: category && CATEGORY_OPTIONS.includes(category as CategoryOption) ? (category as CategoryOption) : "Todas",
     view: view === "collections" ? "collections" : "artworks",
     query: params.get("q") || "",
     collection: params.get("collection") || "all",
@@ -59,7 +68,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [selectedCategory, setSelectedCategory] = useState(initialFilters.category);
-  const [pinturaView, setPinturaView] = useState<"artworks" | "collections">(initialFilters.view);
+  const [pinturaView, setPinturaView] = useState<GalleryView>(initialFilters.view);
   const [clientSearch, setClientSearch] = useState(initialFilters.query);
   const [selectedCollection, setSelectedCollection] = useState(initialFilters.collection);
   const [imageFallbackById, setImageFallbackById] = useState<Record<string, ImageFallbackState>>({});
