@@ -24,6 +24,8 @@ export default function AdminPage() {
   const [itemId, setItemId] = useState("");
   const [location, setLocation] = useState("");
   const [dimensions, setDimensions] = useState("");
+  const [collections, setCollections] = useState<string[]>([]);
+  const [collectionDraft, setCollectionDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
   
   const [uploading, setUploading] = useState(false);
@@ -39,6 +41,8 @@ export default function AdminPage() {
   const [editItemId, setEditItemId] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editDimensions, setEditDimensions] = useState("");
+  const [editCollections, setEditCollections] = useState<string[]>([]);
+  const [editCollectionDraft, setEditCollectionDraft] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
@@ -324,6 +328,55 @@ export default function AdminPage() {
     });
   };
 
+  const parseCollections = (value: unknown): string[] => {
+    const values = Array.isArray(value)
+      ? value
+      : typeof value === "string"
+        ? value.split(",")
+        : [];
+
+    const unique = new Set<string>();
+    const normalized: string[] = [];
+
+    for (const raw of values) {
+      const text = String(raw || "").trim();
+      if (!text) continue;
+
+      const key = text.toLowerCase();
+      if (unique.has(key)) continue;
+
+      unique.add(key);
+      normalized.push(text);
+    }
+
+    return normalized;
+  };
+
+  const addCollectionTag = (
+    draft: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    draftSetter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const next = draft.trim();
+    if (!next) return;
+
+    setter((prev) => parseCollections([...prev, next]));
+    draftSetter("");
+  };
+
+  const removeCollectionTag = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>
+  ) => {
+    setter((prev) => prev.filter((item) => item.toLowerCase() !== value.toLowerCase()));
+  };
+
+  const availableCollections = Array.from(
+    new Set(
+      artworks.flatMap((art) => parseCollections(art.collections))
+    )
+  ).sort((a, b) => a.localeCompare(b, "es"));
+
   const isItemIdTaken = (rawItemId: string, excludeArtworkId?: string) => {
     const normalized = rawItemId.trim().toLowerCase();
     if (!normalized) return false;
@@ -359,6 +412,7 @@ export default function AdminPage() {
         itemId: itemId.trim(),
         location: location.trim(),
         dimensions: dimensions.trim(),
+        collections: parseCollections(collections),
         category,
         url: uploaded.url,
         driveFileId: uploaded.fileId,
@@ -376,6 +430,8 @@ export default function AdminPage() {
       setItemId("");
       setLocation("");
       setDimensions("");
+      setCollections([]);
+      setCollectionDraft("");
       setFile(null);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
@@ -425,6 +481,8 @@ export default function AdminPage() {
     setEditItemId(artwork.itemId || "");
     setEditLocation(artwork.location || "");
     setEditDimensions(artwork.dimensions || "");
+    setEditCollections(parseCollections(artwork.collections));
+    setEditCollectionDraft("");
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -445,6 +503,7 @@ export default function AdminPage() {
         itemId: editItemId.trim(),
         location: editLocation.trim(),
         dimensions: editDimensions.trim(),
+        collections: parseCollections(editCollections),
         status: editStatus,
         category: "Pintura",
       };
@@ -514,10 +573,11 @@ export default function AdminPage() {
     const itemIdText = String(art.itemId || "").toLowerCase();
     const locationText = String(art.location || "").toLowerCase();
     const dimensionsText = String(art.dimensions || "").toLowerCase();
+    const collectionsText = parseCollections(art.collections).join(" ").toLowerCase();
     const providerText = String(art.provider || "").toLowerCase();
     const driveIdText = String(art.driveFileId || "").toLowerCase();
 
-    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, dimensionsText, providerText, driveIdText].join(" ");
+    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, dimensionsText, collectionsText, providerText, driveIdText].join(" ");
 
     const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
     const matchesCategory = searchCategory === "all" || categoryText === searchCategory.toLowerCase();
@@ -669,6 +729,56 @@ export default function AdminPage() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Colecciones (opcional)</label>
+                    <div className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                      <div className="flex flex-wrap gap-2">
+                        {collections.length === 0 ? (
+                          <span className="text-xs text-zinc-600">Sin colección asignada</span>
+                        ) : (
+                          collections.map((name) => (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => removeCollectionTag(name, setCollections)}
+                              className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[11px] text-zinc-300"
+                            >
+                              {name} ×
+                            </button>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          value={collectionDraft}
+                          onChange={(e) => setCollectionDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === ",") {
+                              e.preventDefault();
+                              addCollectionTag(collectionDraft, setCollections, setCollectionDraft);
+                            }
+                          }}
+                          list="existing-collections"
+                          placeholder="Escribí y presioná Enter (ej. Rostros)"
+                          className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addCollectionTag(collectionDraft, setCollections, setCollectionDraft)}
+                          className="rounded-xl border border-zinc-700 px-4 text-xs uppercase tracking-widest text-zinc-300"
+                        >
+                          Agregar
+                        </button>
+                      </div>
+                      <datalist id="existing-collections">
+                        {availableCollections.map((name) => (
+                          <option key={name} value={name} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Descripción</label>
                   <textarea 
@@ -814,6 +924,7 @@ export default function AdminPage() {
                         <p className="text-sm font-mono text-zinc-400">${art.price}</p>
                         <p className="truncate text-xs text-zinc-500">Ubicación: {art.location || "(sin ubicación)"}</p>
                         <p className="truncate text-xs text-zinc-500">Dimensiones: {art.dimensions || "(sin dimensiones)"}</p>
+                        <p className="truncate text-xs text-zinc-500">Colecciones: {parseCollections(art.collections).join(", ") || "(sin colección)"}</p>
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -947,6 +1058,49 @@ export default function AdminPage() {
                   placeholder="Dimensiones (ej. 80 x 120 cm)"
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
                 />
+              </div>
+
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+                <p className="text-xs uppercase tracking-widest text-zinc-400">Colecciones (opcional)</p>
+                <div className="flex flex-wrap gap-2">
+                  {editCollections.length === 0 ? (
+                    <span className="text-xs text-zinc-600">Sin colección asignada</span>
+                  ) : (
+                    editCollections.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => removeCollectionTag(name, setEditCollections)}
+                        className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[11px] text-zinc-300"
+                      >
+                        {name} ×
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    value={editCollectionDraft}
+                    onChange={(e) => setEditCollectionDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === ",") {
+                        e.preventDefault();
+                        addCollectionTag(editCollectionDraft, setEditCollections, setEditCollectionDraft);
+                      }
+                    }}
+                    list="existing-collections"
+                    placeholder="Escribí y presioná Enter"
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => addCollectionTag(editCollectionDraft, setEditCollections, setEditCollectionDraft)}
+                    className="rounded-xl border border-zinc-700 px-4 text-xs uppercase tracking-widest text-zinc-300"
+                  >
+                    Agregar
+                  </button>
+                </div>
               </div>
 
               <select

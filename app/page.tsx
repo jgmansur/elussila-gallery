@@ -17,6 +17,7 @@ type Artwork = {
   itemId?: string;
   location?: string;
   dimensions?: string;
+  collections?: string[];
   status: "available" | "reserved" | "sold";
   provider?: "drive" | "firebase" | string;
   driveFileId?: string;
@@ -32,9 +33,35 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("Todas");
+  const [pinturaView, setPinturaView] = useState<"artworks" | "collections">("artworks");
+  const [clientSearch, setClientSearch] = useState("");
   const [imageFallbackById, setImageFallbackById] = useState<Record<string, ImageFallbackState>>({});
 
   const categories = ["Todas", "Pintura"];
+
+  const parseCollections = (value: unknown): string[] => {
+    const values = Array.isArray(value)
+      ? value
+      : typeof value === "string"
+        ? value.split(",")
+        : [];
+
+    const unique = new Set<string>();
+    const normalized: string[] = [];
+
+    for (const raw of values) {
+      const text = String(raw || "").trim();
+      if (!text) continue;
+
+      const key = text.toLowerCase();
+      if (unique.has(key)) continue;
+
+      unique.add(key);
+      normalized.push(text);
+    }
+
+    return normalized;
+  };
 
   useEffect(() => {
     // Escuchar cambios en la colección 'artworks'
@@ -54,6 +81,7 @@ export default function Home() {
           itemId: data.itemId || "",
           location: data.location || "",
           dimensions: data.dimensions || "",
+          collections: parseCollections(data.collections),
           status: data.status || "available",
           provider: data.provider,
           driveFileId: data.driveFileId,
@@ -89,9 +117,41 @@ export default function Home() {
     }).format(price);
   };
 
-  const filteredArtworks = selectedCategory === "Todas" 
-    ? artworks 
-    : artworks.filter(a => a.category === selectedCategory);
+  const normalizedClientSearch = clientSearch.trim().toLowerCase();
+
+  const categoryFilteredArtworks = selectedCategory === "Todas"
+    ? artworks
+    : artworks.filter((artwork) => artwork.category === selectedCategory);
+
+  const searchFilteredArtworks = categoryFilteredArtworks.filter((artwork) => {
+    const searchable = [
+      artwork.title,
+      artwork.description,
+      artwork.category,
+      String(artwork.price ?? ""),
+      artwork.status,
+      artwork.itemId || "",
+      artwork.dimensions || "",
+      ...(artwork.collections || []),
+    ].join(" ").toLowerCase();
+
+    return !normalizedClientSearch || searchable.includes(normalizedClientSearch);
+  });
+
+  const artworksWithCollections = searchFilteredArtworks.filter((artwork) => (artwork.collections || []).length > 0);
+  const collectionsMap = new Map<string, Artwork[]>();
+  for (const artwork of artworksWithCollections) {
+    for (const collectionName of artwork.collections || []) {
+      if (!collectionsMap.has(collectionName)) {
+        collectionsMap.set(collectionName, []);
+      }
+      collectionsMap.get(collectionName)?.push(artwork);
+    }
+  }
+  const collectionGroups = Array.from(collectionsMap.entries()).sort(([a], [b]) => a.localeCompare(b, "es"));
+
+  const isCollectionsView = selectedCategory === "Pintura" && pinturaView === "collections";
+  const artworksToRender = isCollectionsView ? artworksWithCollections : searchFilteredArtworks;
 
   const resolveImageCandidates = (artwork: Artwork) => {
     if (artwork.provider === "drive" && artwork.driveFileId) {
@@ -130,6 +190,72 @@ export default function Home() {
     });
   };
 
+  const renderArtworkCard = (artwork: Artwork, cardKey?: string) => {
+    const paddingPercentage = (artwork.height / artwork.width) * 100;
+    const isSold = artwork.status === "sold";
+    const isReserved = artwork.status === "reserved";
+    const imageUrl = resolveImageUrl(artwork);
+
+    return (
+      <div
+        key={cardKey || artwork.id}
+        onClick={() => setSelectedArtwork(artwork)}
+        className="masonry-item mb-6 group relative bg-zinc-900/50 border border-transparent hover:border-zinc-800 transition-all duration-700 cursor-pointer overflow-hidden rounded-sm shadow-2xl shadow-black/50"
+      >
+        <div
+          className="relative w-full"
+          style={{ paddingBottom: `${paddingPercentage}%` }}
+        >
+          {artwork.provider === "drive" ? (
+            <img
+              src={imageUrl}
+              alt={artwork.title}
+              className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
+              loading="lazy"
+              onError={() => advanceImageFallback(artwork)}
+            />
+          ) : (
+            <Image
+              src={imageUrl}
+              alt={artwork.title}
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              className={`object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
+              loading="lazy"
+              onError={() => advanceImageFallback(artwork)}
+            />
+          )}
+
+          <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-75">
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-zinc-400">
+                {artwork.category}
+              </p>
+              <h3 className="font-serif text-xl font-light text-white tracking-wide">
+                {artwork.title}
+              </h3>
+              <div className="pt-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-white/90 tabular-nums">
+                  {isSold ? "Vendida" : formatPrice(artwork.price)}
+                </span>
+                {!isSold && !isReserved && (
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-500 border border-zinc-800 px-2 py-0.5 rounded-full">
+                    Disponible
+                  </span>
+                )}
+                {isReserved && (
+                  <span className="text-[9px] uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                    Reservada
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <main className="min-h-screen bg-[#050505] text-zinc-300 font-sans selection:bg-zinc-800 selection:text-white">
       {/* Background decoration */}
@@ -151,7 +277,12 @@ export default function Home() {
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => {
+                setSelectedCategory(cat);
+                if (cat !== "Pintura") {
+                  setPinturaView("artworks");
+                }
+              }}
               className={`px-5 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-all duration-300 rounded-full border ${
                 selectedCategory === cat 
                   ? "bg-white text-black border-white" 
@@ -162,95 +293,85 @@ export default function Home() {
             </button>
           ))}
         </div>
+
+        {selectedCategory === "Pintura" && (
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => setPinturaView("artworks")}
+              className={`px-4 py-1 text-[10px] uppercase tracking-[0.22em] rounded-full border transition-all ${
+                pinturaView === "artworks"
+                  ? "bg-zinc-100 text-black border-zinc-100"
+                  : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Obras
+            </button>
+            <button
+              onClick={() => setPinturaView("collections")}
+              className={`px-4 py-1 text-[10px] uppercase tracking-[0.22em] rounded-full border transition-all ${
+                pinturaView === "collections"
+                  ? "bg-zinc-100 text-black border-zinc-100"
+                  : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Colecciones
+            </button>
+          </div>
+        )}
+
+        <div className="mx-auto mt-3 w-full max-w-md">
+          <input
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="Buscar obra, ID, dimensiones o colección"
+            className="w-full rounded-full border border-zinc-800 bg-zinc-950/70 px-4 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500"
+          />
+        </div>
       </header>
 
       {/* Grid */}
-      <section className="relative masonry-grid px-4 sm:px-8 pb-24 mx-auto max-w-[1600px]">
-        {loading ? (
-          Array.from({ length: 9 }).map((_, i) => (
+      {loading ? (
+        <section className="relative masonry-grid px-4 sm:px-8 pb-24 mx-auto max-w-[1600px]">
+          {Array.from({ length: 9 }).map((_, i) => (
             <div
               key={i}
               className="masonry-item relative bg-zinc-900/30 rounded-lg overflow-hidden animate-pulse border border-zinc-900"
-              style={{ 
-                paddingBottom: i % 3 === 0 ? "130%" : i % 2 === 0 ? "90%" : "110%" 
+              style={{
+                paddingBottom: i % 3 === 0 ? "130%" : i % 2 === 0 ? "90%" : "110%"
               }}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/20 to-transparent" />
             </div>
-          ))
-        ) : filteredArtworks.length === 0 ? (
-          <div className="col-span-full py-32 text-center text-zinc-600 font-light">
-            No artworks found in this category.
-          </div>
-        ) : (
-          filteredArtworks.map((artwork) => {
-            const paddingPercentage = (artwork.height / artwork.width) * 100;
-            const isSold = artwork.status === "sold";
-            const isReserved = artwork.status === "reserved";
-            const imageUrl = resolveImageUrl(artwork);
-
-            return (
-              <div
-                key={artwork.id}
-                onClick={() => setSelectedArtwork(artwork)}
-                className="masonry-item mb-6 group relative bg-zinc-900/50 border border-transparent hover:border-zinc-800 transition-all duration-700 cursor-pointer overflow-hidden rounded-sm shadow-2xl shadow-black/50"
-              >
-                <div 
-                  className="relative w-full"
-                  style={{ paddingBottom: `${paddingPercentage}%` }}
-                >
-                  {artwork.provider === "drive" ? (
-                    <img
-                      src={imageUrl}
-                      alt={artwork.title}
-                      className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
-                      loading="lazy"
-                      onError={() => advanceImageFallback(artwork)}
-                    />
-                  ) : (
-                    <Image
-                      src={imageUrl}
-                      alt={artwork.title}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      className={`object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
-                      loading="lazy"
-                      onError={() => advanceImageFallback(artwork)}
-                    />
-                  )}
-                  
-                  {/* Item Overlay */}
-                  <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-75">
-                    <div className="space-y-1">
-                      <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-zinc-400">
-                        {artwork.category}
-                      </p>
-                      <h3 className="font-serif text-xl font-light text-white tracking-wide">
-                        {artwork.title}
-                      </h3>
-                      <div className="pt-2 flex items-center justify-between">
-                        <span className="text-sm font-medium text-white/90 tabular-nums">
-                          {isSold ? "Vendida" : formatPrice(artwork.price)}
-                        </span>
-                        {!isSold && !isReserved && (
-                          <span className="text-[9px] uppercase tracking-wider text-zinc-500 border border-zinc-800 px-2 py-0.5 rounded-full">
-                            Disponible
-                          </span>
-                        )}
-                        {isReserved && (
-                          <span className="text-[9px] uppercase tracking-wider text-amber-300 border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                            Reservada
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+          ))}
+        </section>
+      ) : isCollectionsView ? (
+        <section className="px-4 sm:px-8 pb-24 mx-auto max-w-[1600px] space-y-12">
+          {collectionGroups.length === 0 ? (
+            <div className="py-32 text-center text-zinc-600 font-light">
+              No hay obras asignadas a colecciones para esta búsqueda.
+            </div>
+          ) : (
+            collectionGroups.map(([collectionName, groupArtworks]) => (
+              <div key={collectionName} className="space-y-4">
+                <h3 className="px-1 text-xs uppercase tracking-[0.25em] text-zinc-400">{collectionName}</h3>
+                <div className="masonry-grid">
+                  {groupArtworks.map((artwork) => renderArtworkCard(artwork, `${collectionName}-${artwork.id}`))}
                 </div>
               </div>
-            );
-          })
-        )}
-      </section>
+            ))
+          )}
+        </section>
+      ) : (
+        <section className="relative masonry-grid px-4 sm:px-8 pb-24 mx-auto max-w-[1600px]">
+          {artworksToRender.length === 0 ? (
+            <div className="py-32 text-center text-zinc-600 font-light">
+              No artworks found in this category.
+            </div>
+          ) : (
+            artworksToRender.map((artwork) => renderArtworkCard(artwork))
+          )}
+        </section>
+      )}
 
       {/* Side Panel / Detail Modal */}
       {selectedArtwork && (
@@ -310,6 +431,11 @@ export default function Home() {
                   </h2>
                   {selectedArtwork.itemId && (
                     <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-400">ID item: {selectedArtwork.itemId}</p>
+                  )}
+                  {(selectedArtwork.collections || []).length > 0 && (
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                      Colecciones: {(selectedArtwork.collections || []).join(" · ")}
+                    </p>
                   )}
                 </header>
 
