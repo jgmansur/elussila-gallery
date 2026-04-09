@@ -36,10 +36,8 @@ export default function AdminPage() {
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
   const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
-  const [searchName, setSearchName] = useState("");
-  const [searchDescription, setSearchDescription] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchCategory, setSearchCategory] = useState("all");
-  const [searchPrice, setSearchPrice] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
@@ -413,22 +411,24 @@ export default function AdminPage() {
     )
   ).sort((a, b) => a.localeCompare(b, "es"));
 
-  const normalizedName = searchName.trim().toLowerCase();
-  const normalizedDescription = searchDescription.trim().toLowerCase();
-  const normalizedPrice = searchPrice.trim();
+  const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredArtworks = artworks.filter((art) => {
     const title = String(art.title || "").toLowerCase();
     const descriptionText = String(art.description || "").toLowerCase();
     const categoryText = String(art.category || "").toLowerCase();
     const priceText = String(art.price ?? "").toLowerCase();
+    const statusText = String(art.status || "").toLowerCase();
+    const idText = String(art.id || "").toLowerCase();
+    const providerText = String(art.provider || "").toLowerCase();
+    const driveIdText = String(art.driveFileId || "").toLowerCase();
 
-    const matchesName = !normalizedName || title.includes(normalizedName);
-    const matchesDescription = !normalizedDescription || descriptionText.includes(normalizedDescription);
+    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, providerText, driveIdText].join(" ");
+
+    const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
     const matchesCategory = searchCategory === "all" || categoryText === searchCategory.toLowerCase();
-    const matchesPrice = !normalizedPrice || priceText.includes(normalizedPrice);
 
-    return matchesName && matchesDescription && matchesCategory && matchesPrice;
+    return matchesQuery && matchesCategory;
   });
 
   if (loadingApp) {
@@ -625,23 +625,11 @@ export default function AdminPage() {
 
             <div className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-900/30 p-4 md:p-6">
               <p className="mb-4 text-xs uppercase tracking-widest text-zinc-500">Buscar entradas</p>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <input
-                  value={searchName}
-                  onChange={(e) => setSearchName(e.target.value)}
-                  placeholder="Buscar por nombre"
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
-                />
-                <input
-                  value={searchDescription}
-                  onChange={(e) => setSearchDescription(e.target.value)}
-                  placeholder="Buscar por descripción"
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
-                />
-                <input
-                  value={searchPrice}
-                  onChange={(e) => setSearchPrice(e.target.value)}
-                  placeholder="Buscar por precio"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por nombre, descripción, precio, estado, id, provider..."
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
                 />
                 <select
