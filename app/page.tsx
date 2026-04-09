@@ -20,6 +20,7 @@ type Artwork = {
   collections?: string[];
   featured?: boolean;
   galleryUrls?: string[];
+  galleryDriveFileIds?: string[];
   status: "available" | "reserved" | "sold";
   provider?: "drive" | "firebase" | string;
   driveFileId?: string;
@@ -69,6 +70,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedImageFallbackIndex, setSelectedImageFallbackIndex] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState(initialFilters.category);
   const [pinturaView, setPinturaView] = useState<GalleryView>(initialFilters.view);
   const [clientSearch, setClientSearch] = useState(initialFilters.query);
@@ -109,6 +111,12 @@ export default function Home() {
       .filter(Boolean);
   };
 
+  const buildDriveCandidates = (fileId: string, size: number) => [
+    `https://lh3.googleusercontent.com/d/${fileId}=w${size}`,
+    `https://drive.google.com/thumbnail?id=${fileId}&sz=w${size}`,
+    `https://drive.google.com/uc?export=view&id=${fileId}`,
+  ];
+
   const shuffleArtworks = (items: Artwork[]) => {
     const copy = [...items];
     for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -139,6 +147,7 @@ export default function Home() {
           collections: parseCollections(data.collections),
           featured: Boolean(data.featured),
           galleryUrls: parseStringArray(data.galleryUrls),
+          galleryDriveFileIds: parseStringArray(data.galleryDriveFileIds),
           status: data.status || "available",
           provider: data.provider,
           driveFileId: data.driveFileId,
@@ -222,25 +231,21 @@ export default function Home() {
   const artworksToRender = isCollectionsView ? artworksWithCollections : searchFilteredArtworks;
 
   const getArtworkImages = (artwork: Artwork) => {
-    const gallery = parseStringArray(artwork.galleryUrls);
-    const fallbackMain = artwork.url ? [artwork.url] : [];
-    const merged = gallery.length > 0 ? gallery : fallbackMain;
-
-    const unique = new Set<string>();
-    const normalized: string[] = [];
-    for (const url of merged) {
-      if (!url || unique.has(url)) continue;
-      unique.add(url);
-      normalized.push(url);
+    const galleryDriveIds = parseStringArray(artwork.galleryDriveFileIds);
+    if (galleryDriveIds.length > 0) {
+      return galleryDriveIds.map((id) => buildDriveCandidates(id, 2200)[0]);
     }
 
-    return normalized;
-  };
+    const gallery = parseStringArray(artwork.galleryUrls);
+    if (gallery.length > 0) {
+      return gallery;
+    }
 
-  const getPrimaryImageUrl = (artwork: Artwork) => {
-    const images = getArtworkImages(artwork);
-    if (images.length > 0) return images[0];
-    return resolveImageUrl(artwork);
+    if (artwork.provider === "drive" && artwork.driveFileId) {
+      return [buildDriveCandidates(artwork.driveFileId, 2200)[0]];
+    }
+
+    return artwork.url ? [artwork.url] : [];
   };
 
   useEffect(() => {
@@ -266,19 +271,24 @@ export default function Home() {
   }, [activeCollectionFilter, clientSearch, pinturaView, selectedCategory]);
 
   const resolveImageCandidates = (artwork: Artwork) => {
+    const primaryGalleryDriveId = parseStringArray(artwork.galleryDriveFileIds)[0];
+    if (primaryGalleryDriveId) {
+      return buildDriveCandidates(primaryGalleryDriveId, 2000);
+    }
+
+    const primaryGalleryUrl = parseStringArray(artwork.galleryUrls)[0];
+    if (primaryGalleryUrl) {
+      return [primaryGalleryUrl];
+    }
+
     if (artwork.provider === "drive" && artwork.driveFileId) {
-      // Distintas variantes porque Drive puede responder distinto según región/cookies
-      return [
-        `https://drive.google.com/thumbnail?id=${artwork.driveFileId}&sz=w2000`,
-        `https://drive.google.com/uc?export=view&id=${artwork.driveFileId}`,
-        `https://lh3.googleusercontent.com/d/${artwork.driveFileId}=w2000`,
-      ];
+      return buildDriveCandidates(artwork.driveFileId, 2000);
     }
 
     return [artwork.url];
   };
 
-  const resolveImageUrl = (artwork: Artwork) => {
+  const resolvePrimaryImageUrl = (artwork: Artwork) => {
     const candidates = resolveImageCandidates(artwork);
     const currentIndex = imageFallbackById[artwork.id]?.currentIndex ?? 0;
     return candidates[currentIndex] ?? candidates[0];
@@ -306,7 +316,7 @@ export default function Home() {
     const paddingPercentage = (artwork.height / artwork.width) * 100;
     const isSold = artwork.status === "sold";
     const isReserved = artwork.status === "reserved";
-    const imageUrl = getPrimaryImageUrl(artwork);
+    const imageUrl = resolvePrimaryImageUrl(artwork);
 
     return (
       <div
@@ -314,6 +324,7 @@ export default function Home() {
         onClick={() => {
           setSelectedArtwork(artwork);
           setSelectedImageIndex(0);
+          setSelectedImageFallbackIndex(0);
         }}
         className="masonry-item mb-6 group relative bg-zinc-900/50 border border-transparent hover:border-zinc-800 transition-all duration-700 cursor-pointer overflow-hidden rounded-sm shadow-2xl shadow-black/50"
       >
@@ -377,20 +388,48 @@ export default function Home() {
     );
   };
 
-  const selectedArtworkImages = selectedArtwork
-    ? (getArtworkImages(selectedArtwork).length > 0 ? getArtworkImages(selectedArtwork) : [resolveImageUrl(selectedArtwork)])
-    : [];
+  const selectedArtworkImages = selectedArtwork ? getArtworkImages(selectedArtwork) : [];
 
-  const activeSelectedImage = selectedArtworkImages[selectedImageIndex] || selectedArtworkImages[0] || "";
+  const getSelectedImageCandidates = () => {
+    if (!selectedArtwork) return [];
+
+    const galleryDriveIds = parseStringArray(selectedArtwork.galleryDriveFileIds);
+    const galleryUrls = parseStringArray(selectedArtwork.galleryUrls);
+
+    if (galleryDriveIds[selectedImageIndex]) {
+      return buildDriveCandidates(galleryDriveIds[selectedImageIndex], 2400);
+    }
+    if (galleryUrls[selectedImageIndex]) {
+      return [galleryUrls[selectedImageIndex]];
+    }
+    if (selectedImageIndex === 0 && selectedArtwork.provider === "drive" && selectedArtwork.driveFileId) {
+      return buildDriveCandidates(selectedArtwork.driveFileId, 2400);
+    }
+    if (selectedImageIndex === 0 && selectedArtwork.url) {
+      return [selectedArtwork.url];
+    }
+    return [];
+  };
+
+  const selectedImageCandidates = getSelectedImageCandidates();
+  const activeSelectedImage = selectedImageCandidates[selectedImageFallbackIndex] || selectedArtworkImages[selectedImageIndex] || selectedArtworkImages[0] || "";
+
+  const handleSelectedImageError = () => {
+    if (selectedImageFallbackIndex < selectedImageCandidates.length - 1) {
+      setSelectedImageFallbackIndex((prev) => prev + 1);
+    }
+  };
 
   const goToPrevImage = () => {
     if (selectedArtworkImages.length <= 1) return;
     setSelectedImageIndex((prev) => (prev - 1 + selectedArtworkImages.length) % selectedArtworkImages.length);
+    setSelectedImageFallbackIndex(0);
   };
 
   const goToNextImage = () => {
     if (selectedArtworkImages.length <= 1) return;
     setSelectedImageIndex((prev) => (prev + 1) % selectedArtworkImages.length);
+    setSelectedImageFallbackIndex(0);
   };
 
   return (
@@ -570,6 +609,7 @@ export default function Home() {
           onClick={() => {
             setSelectedArtwork(null);
             setSelectedImageIndex(0);
+            setSelectedImageFallbackIndex(0);
           }}
         >
           {/* Close Area */}
@@ -578,6 +618,7 @@ export default function Home() {
             onClick={() => {
               setSelectedArtwork(null);
               setSelectedImageIndex(0);
+              setSelectedImageFallbackIndex(0);
             }}
           >
             <div className="flex items-center space-x-3">
@@ -630,6 +671,7 @@ export default function Home() {
                 alt={`${selectedArtwork.title} ${selectedImageIndex + 1}`}
                 className="h-full w-full object-contain p-1 md:p-2 transition-transform duration-700 group-hover/viewer:scale-[1.01]"
                 loading="eager"
+                onError={handleSelectedImageError}
               />
 
               {selectedArtworkImages.length > 1 && (
@@ -639,7 +681,10 @@ export default function Home() {
                       <button
                         key={`${selectedArtwork.id}-thumb-${index}`}
                         type="button"
-                        onClick={() => setSelectedImageIndex(index)}
+                        onClick={() => {
+                          setSelectedImageIndex(index);
+                          setSelectedImageFallbackIndex(0);
+                        }}
                         className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-md border ${selectedImageIndex === index ? "border-white" : "border-zinc-700"}`}
                       >
                         <img src={imageUrl} alt={`Miniatura ${index + 1}`} className="h-full w-full object-cover" loading="lazy" />
