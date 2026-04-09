@@ -58,9 +58,6 @@ export default function RootLayout({
               <Link href="/bio" className="hover:text-white transition-colors">
                 Bio
               </Link>
-              <Link href="/contacto" className="hover:text-white transition-colors">
-                Contacto
-              </Link>
               <Link href="/admin" className="hover:text-white transition-colors">
                 Admin
               </Link>
