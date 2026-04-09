@@ -154,6 +154,16 @@ export default function AdminPage() {
   };
 
   const resolveImageCandidates = (artwork: any) => {
+    const galleryDriveFileIds = parseStringArray(artwork?.galleryDriveFileIds);
+    if (galleryDriveFileIds.length > 0) {
+      const primaryId = galleryDriveFileIds[0];
+      return [
+        `https://lh3.googleusercontent.com/d/${primaryId}=w1200`,
+        `https://drive.google.com/thumbnail?id=${primaryId}&sz=w1200`,
+        `https://drive.google.com/uc?export=view&id=${primaryId}`,
+      ];
+    }
+
     const galleryUrls = parseStringArray(artwork?.galleryUrls);
     if (galleryUrls.length > 0) {
       return galleryUrls;
@@ -1030,6 +1040,18 @@ export default function AdminPage() {
                     </div>
                     <p className="font-bold text-lg mb-1 truncate max-w-[200px] mx-auto">{file.name}</p>
                     <p className="text-zinc-500 text-xs uppercase tracking-widest">Listo para publicar</p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (file) {
+                          openCropperForFile(file, "new");
+                        }
+                      }}
+                      className="mt-3 text-xs text-zinc-300 hover:text-white transition-colors"
+                    >
+                      Recortar foto principal
+                    </button>
                     <button 
                       type="button" 
                       onClick={(e) => {
@@ -1436,6 +1458,16 @@ export default function AdminPage() {
                   >
                     Subir nueva imagen
                   </button>
+
+                  {editImageFile && (
+                    <button
+                      type="button"
+                      onClick={() => openCropperForFile(editImageFile, "edit")}
+                      className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+                    >
+                      Recortar nueva imagen
+                    </button>
+                  )}
 
                   {editImageFile && (
                     <button

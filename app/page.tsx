@@ -631,12 +631,12 @@ export default function Home() {
 
           {/* Panel content */}
           <div 
-            className="h-full w-full max-w-[99vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700"
+            className="h-full w-full max-w-[99vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image Viewer Section */}
             <div
-              className="relative overflow-hidden bg-black flex items-center justify-center group/viewer md:flex-[2.2]"
+              className="relative h-[66vh] min-h-[360px] overflow-hidden bg-black flex items-center justify-center group/viewer md:h-full md:min-h-0 md:flex-[2.2]"
               onTouchStart={(e) => setTouchStartX(e.touches[0]?.clientX ?? null)}
               onTouchEnd={(e) => {
                 if (touchStartX === null) return;
@@ -669,7 +669,7 @@ export default function Home() {
               <img
                 src={activeSelectedImage}
                 alt={`${selectedArtwork.title} ${selectedImageIndex + 1}`}
-                className="h-full w-full object-contain p-1 md:p-2 transition-transform duration-700 group-hover/viewer:scale-[1.01]"
+                className="h-full w-full object-contain p-0 md:p-2 transition-transform duration-700 group-hover/viewer:scale-[1.01]"
                 loading="eager"
                 onError={handleSelectedImageError}
               />
@@ -696,7 +696,7 @@ export default function Home() {
             </div>
 
             {/* Info Section */}
-            <div className="w-full md:w-[340px] p-8 md:p-10 flex flex-col justify-center bg-[#0a0a0a] border-l border-zinc-900 shadow-2xl">
+            <div className="w-full h-[34vh] min-h-[230px] overflow-y-auto md:h-full md:min-h-0 md:w-[340px] p-6 md:p-10 flex flex-col justify-start md:justify-center bg-[#0a0a0a] border-t md:border-t-0 border-l-0 md:border-l border-zinc-900 shadow-2xl">
               <div className="space-y-12">
                 <header className="space-y-4">
                   <p className="text-[10px] uppercase tracking-[0.3em] font-semibold text-zinc-500">
