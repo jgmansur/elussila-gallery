@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [description, setDescription] = useState("");
   const [itemId, setItemId] = useState("");
   const [location, setLocation] = useState("");
+  const [dimensions, setDimensions] = useState("");
   const [file, setFile] = useState<File | null>(null);
   
   const [uploading, setUploading] = useState(false);
@@ -37,6 +38,7 @@ export default function AdminPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editItemId, setEditItemId] = useState("");
   const [editLocation, setEditLocation] = useState("");
+  const [editDimensions, setEditDimensions] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
@@ -356,6 +358,7 @@ export default function AdminPage() {
         description,
         itemId: itemId.trim(),
         location: location.trim(),
+        dimensions: dimensions.trim(),
         category,
         url: uploaded.url,
         driveFileId: uploaded.fileId,
@@ -372,6 +375,7 @@ export default function AdminPage() {
       setDescription("");
       setItemId("");
       setLocation("");
+      setDimensions("");
       setFile(null);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
@@ -420,6 +424,7 @@ export default function AdminPage() {
     setEditDescription(artwork.description || "");
     setEditItemId(artwork.itemId || "");
     setEditLocation(artwork.location || "");
+    setEditDimensions(artwork.dimensions || "");
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -439,6 +444,7 @@ export default function AdminPage() {
         description: editDescription,
         itemId: editItemId.trim(),
         location: editLocation.trim(),
+        dimensions: editDimensions.trim(),
         status: editStatus,
         category: "Pintura",
       };
@@ -507,10 +513,11 @@ export default function AdminPage() {
     const idText = String(art.id || "").toLowerCase();
     const itemIdText = String(art.itemId || "").toLowerCase();
     const locationText = String(art.location || "").toLowerCase();
+    const dimensionsText = String(art.dimensions || "").toLowerCase();
     const providerText = String(art.provider || "").toLowerCase();
     const driveIdText = String(art.driveFileId || "").toLowerCase();
 
-    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, providerText, driveIdText].join(" ");
+    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, dimensionsText, providerText, driveIdText].join(" ");
 
     const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
     const matchesCategory = searchCategory === "all" || categoryText === searchCategory.toLowerCase();
@@ -651,6 +658,17 @@ export default function AdminPage() {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Dimensiones</label>
+                    <input
+                      type="text"
+                      value={dimensions}
+                      onChange={(e) => setDimensions(e.target.value)}
+                      placeholder="Ej. 80 x 120 cm"
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors"
+                    />
+                  </div>
+
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Descripción</label>
                   <textarea 
@@ -744,7 +762,7 @@ export default function AdminPage() {
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por nombre, ID item, descripción, ubicación, precio, estado..."
+                  placeholder="Buscar por nombre, ID item, descripción, ubicación, dimensiones, precio..."
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
                 />
                 <select
@@ -795,6 +813,7 @@ export default function AdminPage() {
                         <p className="text-[11px] uppercase tracking-widest text-zinc-500">ID item: {art.itemId || "(sin ID)"}</p>
                         <p className="text-sm font-mono text-zinc-400">${art.price}</p>
                         <p className="truncate text-xs text-zinc-500">Ubicación: {art.location || "(sin ubicación)"}</p>
+                        <p className="truncate text-xs text-zinc-500">Dimensiones: {art.dimensions || "(sin dimensiones)"}</p>
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -909,7 +928,7 @@ export default function AdminPage() {
                 className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
               />
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <input
                   value={editItemId}
                   onChange={(e) => setEditItemId(e.target.value)}
@@ -920,6 +939,12 @@ export default function AdminPage() {
                   value={editLocation}
                   onChange={(e) => setEditLocation(e.target.value)}
                   placeholder="Ubicación (solo admin)"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+                />
+                <input
+                  value={editDimensions}
+                  onChange={(e) => setEditDimensions(e.target.value)}
+                  placeholder="Dimensiones (ej. 80 x 120 cm)"
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
                 />
               </div>

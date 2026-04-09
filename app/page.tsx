@@ -16,6 +16,7 @@ type Artwork = {
   category: string;
   itemId?: string;
   location?: string;
+  dimensions?: string;
   status: "available" | "reserved" | "sold";
   provider?: "drive" | "firebase" | string;
   driveFileId?: string;
@@ -52,6 +53,7 @@ export default function Home() {
           category: data.category || "Pintura",
           itemId: data.itemId || "",
           location: data.location || "",
+          dimensions: data.dimensions || "",
           status: data.status || "available",
           provider: data.provider,
           driveFileId: data.driveFileId,
@@ -380,7 +382,7 @@ export default function Home() {
                 <footer className="pt-16 grid grid-cols-2 gap-8 border-t border-zinc-900">
                   <div>
                     <h4 className="text-[10px] uppercase tracking-widest text-zinc-700 mb-1">Dimensions</h4>
-                    <p className="text-xs text-zinc-500 font-light">Original Aspect Ratio</p>
+                    <p className="text-xs text-zinc-500 font-light">{selectedArtwork.dimensions || "Original Aspect Ratio"}</p>
                   </div>
                   <div>
                     <h4 className="text-[10px] uppercase tracking-widest text-zinc-700 mb-1">Release</h4>
