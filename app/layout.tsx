@@ -15,17 +15,17 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   title: {
-    default: "Elu Sila | Fine Art Gallery",
-    template: "%s | Elu Sila"
+    default: "EluSSila | Fine Art Gallery",
+    template: "%s | EluSSila"
   },
-  description: "Galería de arte exclusiva de Elu Sila. Colecciones curadas de pintura, escultura y joyería para coleccionistas sofisticados.",
-  keywords: ["arte", "galería", "joyería de autor", "escultura moderna", "pintura", "Elu Sila"],
-  authors: [{ name: "Elu Sila" }],
+  description: "Galería de arte exclusiva de EluSSila. Colecciones curadas de pintura, escultura y joyería para coleccionistas sofisticados.",
+  keywords: ["arte", "galería", "joyería de autor", "escultura moderna", "pintura", "EluSSila"],
+  authors: [{ name: "EluSSila" }],
   openGraph: {
-    title: "Elu Sila | Fine Art Gallery",
+    title: "EluSSila | Fine Art Gallery",
     description: "Piezas únicas de arte físico y digital.",
     url: "https://elussila.art",
-    siteName: "Elu Sila Gallery",
+    siteName: "EluSSila Gallery",
     locale: "es_AR",
     type: "website",
   },
@@ -49,7 +49,7 @@ export default function RootLayout({
         <header className="sticky top-0 z-40 border-b border-zinc-900/80 bg-zinc-950/90 backdrop-blur">
           <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
             <Link href="/" className="font-serif text-xl tracking-tight text-white">
-              Elussila
+              EluSSila
             </Link>
             <div className="flex items-center gap-5 text-xs uppercase tracking-[0.2em] text-zinc-400">
               <Link href="/" className="hover:text-white transition-colors">
@@ -71,7 +71,7 @@ export default function RootLayout({
         <div className="flex-1">{children}</div>
 
         <footer className="border-t border-zinc-900 px-4 py-10 text-center text-xs tracking-wide text-zinc-500">
-          © {new Date().getFullYear()} Elussila Gallery · Obra original de Eva Lucila González.
+          © {new Date().getFullYear()} EluSSila Gallery · Obra original de Eva Lucila González.
         </footer>
       </body>
     </html>

@@ -133,7 +133,7 @@ export default function Home() {
           Fine Art Gallery
         </div>
         <h1 className="font-serif text-6xl md:text-8xl font-thin tracking-tighter text-white">
-          Elu <span className="text-zinc-500">Sila</span>
+          Elu<span className="text-zinc-500">SSila</span>
         </h1>
         <p className="max-w-xl mx-auto text-zinc-400 font-light leading-relaxed text-balance text-lg">
           Exclusive digital and physical artworks curated for sophisticated collectors.
