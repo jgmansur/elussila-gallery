@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { GoogleAuthProvider, reauthenticateWithPopup, signInWithPopup, User, signOut, onAuthStateChanged } from "firebase/auth";
 import { ref } from "firebase/storage";
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, deleteField } from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { deleteObject } from "firebase/storage";
 
@@ -27,13 +27,22 @@ export default function AdminPage() {
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);
   const [imageFallbackById, setImageFallbackById] = useState<Record<string, { currentIndex: number; exhausted: boolean }>>({});
+  const [expandedArtworkId, setExpandedArtworkId] = useState<string | null>(null);
   const [editingArtwork, setEditingArtwork] = useState<any | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
+  const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
+  const [searchName, setSearchName] = useState("");
+  const [searchDescription, setSearchDescription] = useState("");
+  const [searchCategory, setSearchCategory] = useState("all");
+  const [searchPrice, setSearchPrice] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const category = "Pintura";
 
   const createDriveProvider = () => {
@@ -168,6 +177,36 @@ export default function AdminPage() {
     });
   };
 
+  const resetEditImageState = () => {
+    if (editImagePreviewUrl) {
+      URL.revokeObjectURL(editImagePreviewUrl);
+    }
+    setEditImageFile(null);
+    setEditImagePreviewUrl(null);
+    setRemoveCurrentImage(false);
+  };
+
+  const closeEditModal = () => {
+    setEditingArtwork(null);
+    resetEditImageState();
+  };
+
+  const handleEditImageSelection = (selectedFile: File | null) => {
+    if (editImagePreviewUrl) {
+      URL.revokeObjectURL(editImagePreviewUrl);
+    }
+
+    if (!selectedFile) {
+      setEditImageFile(null);
+      setEditImagePreviewUrl(null);
+      return;
+    }
+
+    setEditImageFile(selectedFile);
+    setEditImagePreviewUrl(URL.createObjectURL(selectedFile));
+    setRemoveCurrentImage(false);
+  };
+
   useEffect(() => {
     const unsubApp = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -190,6 +229,14 @@ export default function AdminPage() {
       unsubArt();
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (editImagePreviewUrl) {
+        URL.revokeObjectURL(editImagePreviewUrl);
+      }
+    };
+  }, [editImagePreviewUrl]);
 
   const handleLogin = async () => {
     try {
@@ -295,6 +342,7 @@ export default function AdminPage() {
     setEditPrice(String(artwork.price ?? ""));
     setEditDescription(artwork.description || "");
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
+    resetEditImageState();
   };
 
   const saveArtworkEdits = async () => {
@@ -304,14 +352,51 @@ export default function AdminPage() {
 
     setSavingEdit(true);
     try {
-      await updateDoc(doc(db, "artworks", editingArtwork.id), {
+      const updates: Record<string, any> = {
         title: editTitle.trim(),
         price: Number(editPrice),
         description: editDescription,
         status: editStatus,
         category: "Pintura",
-      });
-      setEditingArtwork(null);
+      };
+
+      if (editImageFile) {
+        const { width, height } = await getImageDimensions(editImageFile);
+        const token = await getDriveAccessToken();
+        const uploaded = await uploadImageToDrive(editImageFile, token);
+
+        updates.url = uploaded.url;
+        updates.driveFileId = uploaded.fileId;
+        updates.provider = "drive";
+        updates.width = width;
+        updates.height = height;
+        updates.storagePath = deleteField();
+      } else if (removeCurrentImage) {
+        updates.url = "";
+        updates.driveFileId = deleteField();
+        updates.storagePath = deleteField();
+        updates.provider = deleteField();
+        updates.width = deleteField();
+        updates.height = deleteField();
+      }
+
+      await updateDoc(doc(db, "artworks", editingArtwork.id), updates);
+
+      const shouldDeletePreviousAsset = Boolean(editImageFile || removeCurrentImage);
+      if (shouldDeletePreviousAsset) {
+        try {
+          if (editingArtwork.driveFileId) {
+            await deleteImageFromDrive(editingArtwork.driveFileId);
+          } else if (editingArtwork.storagePath) {
+            const previousFileRef = ref(storage, editingArtwork.storagePath);
+            await deleteObject(previousFileRef);
+          }
+        } catch (assetError) {
+          console.warn("No se pudo eliminar la imagen anterior", assetError);
+        }
+      }
+
+      closeEditModal();
     } catch (error) {
       console.error(error);
       alert("Error guardando cambios de la obra.");
@@ -319,6 +404,32 @@ export default function AdminPage() {
       setSavingEdit(false);
     }
   };
+
+  const categories = Array.from(
+    new Set(
+      artworks
+        .map((art) => (typeof art.category === "string" ? art.category.trim() : ""))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "es"));
+
+  const normalizedName = searchName.trim().toLowerCase();
+  const normalizedDescription = searchDescription.trim().toLowerCase();
+  const normalizedPrice = searchPrice.trim();
+
+  const filteredArtworks = artworks.filter((art) => {
+    const title = String(art.title || "").toLowerCase();
+    const descriptionText = String(art.description || "").toLowerCase();
+    const categoryText = String(art.category || "").toLowerCase();
+    const priceText = String(art.price ?? "").toLowerCase();
+
+    const matchesName = !normalizedName || title.includes(normalizedName);
+    const matchesDescription = !normalizedDescription || descriptionText.includes(normalizedDescription);
+    const matchesCategory = searchCategory === "all" || categoryText === searchCategory.toLowerCase();
+    const matchesPrice = !normalizedPrice || priceText.includes(normalizedPrice);
+
+    return matchesName && matchesDescription && matchesCategory && matchesPrice;
+  });
 
   if (loadingApp) {
     return (
@@ -512,97 +623,152 @@ export default function AdminPage() {
               Gestión de Colección
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {artworks.map((art) => {
+            <div className="mb-6 rounded-3xl border border-zinc-800 bg-zinc-900/30 p-4 md:p-6">
+              <p className="mb-4 text-xs uppercase tracking-widest text-zinc-500">Buscar entradas</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <input
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  placeholder="Buscar por nombre"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
+                />
+                <input
+                  value={searchDescription}
+                  onChange={(e) => setSearchDescription(e.target.value)}
+                  placeholder="Buscar por descripción"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
+                />
+                <input
+                  value={searchPrice}
+                  onChange={(e) => setSearchPrice(e.target.value)}
+                  placeholder="Buscar por precio"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
+                />
+                <select
+                  value={searchCategory}
+                  onChange={(e) => setSearchCategory(e.target.value)}
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
+                >
+                  <option value="all">Todas las categorías</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {filteredArtworks.map((art) => {
                 const imageUrl = resolveArtworkImageUrl(art);
+                const isExpanded = expandedArtworkId === art.id;
 
                 return (
-                  <div key={art.id} className="bg-zinc-900/40 border border-zinc-800 rounded-3xl overflow-hidden flex flex-col group">
-                  <div className="relative aspect-square overflow-hidden bg-black">
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt={art.title}
-                        onError={() => handleArtworkImageError(art)}
-                        className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${art.status === 'sold' ? 'grayscale opacity-50' : ''}`}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 text-zinc-500 text-xs uppercase tracking-wider">
-                        Imagen no disponible
+                  <div key={art.id} className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900/30">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedArtworkId((prev) => (prev === art.id ? null : art.id))}
+                      className="flex w-full items-center gap-4 p-4 text-left hover:bg-zinc-900/60 transition-colors"
+                    >
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-black">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={art.title}
+                            onError={() => handleArtworkImageError(art)}
+                            className={`h-full w-full object-cover ${art.status === "sold" ? "grayscale opacity-60" : ""}`}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-wider text-zinc-500">
+                            Sin imagen
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] uppercase tracking-widest text-zinc-500">{art.category}</p>
+                        <p className="truncate text-lg font-bold text-white">{art.title}</p>
+                        <p className="text-sm font-mono text-zinc-400">${art.price}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
+                          art.status === "available"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : art.status === "reserved"
+                              ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+                              : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                        }`}>
+                          {art.status === "available" ? "Disponible" : art.status === "reserved" ? "Reservada" : "Vendida"}
+                        </span>
+
+                        <svg
+                          className={`h-5 w-5 text-zinc-500 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="border-t border-zinc-800 p-4 md:p-6">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                          <button
+                            onClick={() => openEditModal(art)}
+                            className="py-2 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => updateArtworkStatus(art, "available")}
+                            className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                              art.status === "available"
+                                ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-300"
+                                : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                            }`}
+                          >
+                            Disponible
+                          </button>
+                          <button
+                            onClick={() => updateArtworkStatus(art, "reserved")}
+                            className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                              art.status === "reserved"
+                                ? "bg-amber-500/20 border-amber-400/40 text-amber-200"
+                                : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                            }`}
+                          >
+                            Reservada
+                          </button>
+                          <button
+                            onClick={() => updateArtworkStatus(art, "sold")}
+                            className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                              art.status === "sold"
+                                ? "bg-zinc-700/40 border-zinc-500/50 text-zinc-200"
+                                : "bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                            }`}
+                          >
+                            Vendida
+                          </button>
+                          <button
+                            onClick={() => handleDelete(art)}
+                            className="py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/20 transition-all"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
                     )}
-                    <div className="absolute top-4 left-4">
-                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
-                         art.status === 'available'
-                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                           : art.status === 'reserved'
-                             ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                             : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                        }`}>
-                         {art.status === 'available' ? 'Disponible' : art.status === 'reserved' ? 'Reservada' : 'Vendida'}
-                       </span>
-                      </div>
-                    </div>
-                   
-                  <div className="p-6 flex flex-col flex-1">
-                    <div className="mb-4">
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">{art.category}</p>
-                      <h3 className="text-lg font-bold truncate">{art.title}</h3>
-                      <p className="text-sm text-zinc-400 font-mono">${art.price}</p>
-                    </div>
-
-                     <div className="mt-auto grid grid-cols-2 gap-2">
-                       <button
-                         onClick={() => openEditModal(art)}
-                         className="py-2 bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500/20 transition-all"
-                       >
-                         Editar
-                       </button>
-                       <button
-                         onClick={() => updateArtworkStatus(art, 'available')}
-                         className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                           art.status === 'available'
-                             ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
-                             : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                         }`}
-                       >
-                         Disponible
-                       </button>
-                       <button
-                         onClick={() => updateArtworkStatus(art, 'reserved')}
-                         className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                           art.status === 'reserved'
-                             ? 'bg-amber-500/20 border-amber-400/40 text-amber-200'
-                             : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                         }`}
-                       >
-                         Reservada
-                       </button>
-                       <button
-                         onClick={() => updateArtworkStatus(art, 'sold')}
-                         className={`py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
-                           art.status === 'sold'
-                             ? 'bg-zinc-700/40 border-zinc-500/50 text-zinc-200'
-                             : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                         }`}
-                       >
-                         Vendida
-                       </button>
-                       <button 
-                         onClick={() => handleDelete(art)}
-                         className="py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-500/20 transition-all"
-                       >
-                         Eliminar
-                       </button>
-                    </div>
-                  </div>
                   </div>
                 );
               })}
               
-              {artworks.length === 0 && (
-                <div className="col-span-full py-20 bg-zinc-900/20 border-2 border-dashed border-zinc-800 rounded-[2.5rem] text-center">
-                  <p className="text-zinc-600 text-sm font-medium uppercase tracking-[0.2em]">No hay obras publicadas todavía</p>
+              {filteredArtworks.length === 0 && (
+                <div className="py-20 bg-zinc-900/20 border-2 border-dashed border-zinc-800 rounded-[2.5rem] text-center">
+                  <p className="text-zinc-600 text-sm font-medium uppercase tracking-[0.2em]">No hay obras que coincidan con la búsqueda</p>
                 </div>
               )}
             </div>
@@ -612,7 +778,7 @@ export default function AdminPage() {
       </div>
 
       {editingArtwork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setEditingArtwork(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeEditModal}>
           <div className="w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-6 text-2xl font-bold text-white">Editar obra</h3>
 
@@ -647,11 +813,79 @@ export default function AdminPage() {
                 <option value="reserved">Reservada</option>
                 <option value="sold">Vendida</option>
               </select>
+
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+                <p className="text-xs uppercase tracking-widest text-zinc-400">Imagen de la obra</p>
+
+                {(editImagePreviewUrl || (editingArtwork.url && !removeCurrentImage)) ? (
+                  <div className="overflow-hidden rounded-xl border border-zinc-800 bg-black">
+                    <img
+                      src={editImagePreviewUrl || resolveArtworkImageUrl(editingArtwork)}
+                      alt={editingArtwork.title}
+                      className="h-56 w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-zinc-700 text-zinc-500 text-xs uppercase tracking-wider">
+                    Sin imagen
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => editFileInputRef.current?.click()}
+                    className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
+                  >
+                    Subir nueva imagen
+                  </button>
+
+                  {editImageFile && (
+                    <button
+                      type="button"
+                      onClick={() => handleEditImageSelection(null)}
+                      className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+                    >
+                      Quitar nueva imagen
+                    </button>
+                  )}
+
+                  {(editingArtwork.url || editingArtwork.driveFileId || editingArtwork.storagePath) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRemoveCurrentImage((prev) => !prev);
+                        if (!removeCurrentImage) {
+                          handleEditImageSelection(null);
+                        }
+                      }}
+                      className={`rounded-xl border px-3 py-2 text-xs ${removeCurrentImage ? "border-red-400/40 bg-red-500/10 text-red-300" : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"}`}
+                    >
+                      {removeCurrentImage ? "Mantener imagen actual" : "Eliminar imagen actual"}
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  ref={editFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleEditImageSelection(e.target.files?.[0] || null)}
+                />
+
+                {editImageFile && (
+                  <p className="text-xs text-emerald-300">Nueva imagen lista: {editImageFile.name}</p>
+                )}
+                {removeCurrentImage && !editImageFile && (
+                  <p className="text-xs text-amber-300">Se guardará la obra sin imagen.</p>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() => setEditingArtwork(null)}
+                onClick={closeEditModal}
                 className="rounded-xl border border-zinc-700 px-4 py-2 text-zinc-300"
               >
                 Cancelar
