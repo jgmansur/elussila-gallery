@@ -19,12 +19,9 @@ type Artwork = {
   driveFileId?: string;
 };
 
-type ImageDebug = {
-  status: "idle" | "loading" | "loaded" | "error";
+type ImageFallbackState = {
   currentIndex: number;
   attempts: number;
-  lastError?: string;
-  activeUrl?: string;
 };
 
 export default function Home() {
@@ -32,8 +29,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("Todas");
-  const [imageDebugById, setImageDebugById] = useState<Record<string, ImageDebug>>({});
-  const [showDebugPanel, setShowDebugPanel] = useState(true);
+  const [imageFallbackById, setImageFallbackById] = useState<Record<string, ImageFallbackState>>({});
 
   const categories = ["Todas", "Pintura"];
 
@@ -105,50 +101,23 @@ export default function Home() {
 
   const resolveImageUrl = (artwork: Artwork) => {
     const candidates = resolveImageCandidates(artwork);
-    const currentIndex = imageDebugById[artwork.id]?.currentIndex ?? 0;
+    const currentIndex = imageFallbackById[artwork.id]?.currentIndex ?? 0;
     return candidates[currentIndex] ?? candidates[0];
   };
 
-  const markImageLoading = (artwork: Artwork) => {
-    setImageDebugById((prev) => ({
-      ...prev,
-      [artwork.id]: {
-        ...(prev[artwork.id] ?? { currentIndex: 0, attempts: 0 }),
-        status: "loading",
-        activeUrl: resolveImageUrl(artwork),
-      },
-    }));
-  };
-
-  const markImageLoaded = (artwork: Artwork) => {
-    setImageDebugById((prev) => ({
-      ...prev,
-      [artwork.id]: {
-        ...(prev[artwork.id] ?? { currentIndex: 0, attempts: 0 }),
-        status: "loaded",
-        activeUrl: resolveImageUrl(artwork),
-      },
-    }));
-  };
-
-  const markImageError = (artwork: Artwork) => {
+  const advanceImageFallback = (artwork: Artwork) => {
     const candidates = resolveImageCandidates(artwork);
 
-    setImageDebugById((prev) => {
-      const current = prev[artwork.id] ?? { status: "idle", currentIndex: 0, attempts: 0 };
+    setImageFallbackById((prev) => {
+      const current = prev[artwork.id] ?? { currentIndex: 0, attempts: 0 };
       const nextIndex = current.currentIndex + 1;
       const hasFallback = nextIndex < candidates.length;
 
       return {
         ...prev,
         [artwork.id]: {
-          status: hasFallback ? "loading" : "error",
           currentIndex: hasFallback ? nextIndex : current.currentIndex,
           attempts: current.attempts + 1,
-          lastError: hasFallback
-            ? `Falló URL ${current.currentIndex + 1}/${candidates.length}. Probando fallback ${nextIndex + 1}/${candidates.length}.`
-            : `Fallaron todas las URLs para esta obra (${candidates.length} intentos).`,
-          activeUrl: hasFallback ? (candidates[nextIndex] ?? candidates[0]) : (candidates[current.currentIndex] ?? candidates[0]),
         },
       };
     });
@@ -229,9 +198,7 @@ export default function Home() {
                       alt={artwork.title}
                       className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
                       loading="lazy"
-                      onLoadStart={() => markImageLoading(artwork)}
-                      onLoad={() => markImageLoaded(artwork)}
-                      onError={() => markImageError(artwork)}
+                      onError={() => advanceImageFallback(artwork)}
                     />
                   ) : (
                     <Image
@@ -241,8 +208,7 @@ export default function Home() {
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                       className={`object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
                       loading="lazy"
-                      onLoad={() => markImageLoaded(artwork)}
-                      onError={() => markImageError(artwork)}
+                      onError={() => advanceImageFallback(artwork)}
                     />
                   )}
                   
@@ -311,9 +277,7 @@ export default function Home() {
                   alt={selectedArtwork.title}
                   className="h-full w-full object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
                   loading="eager"
-                  onLoadStart={() => markImageLoading(selectedArtwork)}
-                  onLoad={() => markImageLoaded(selectedArtwork)}
-                  onError={() => markImageError(selectedArtwork)}
+                  onError={() => advanceImageFallback(selectedArtwork)}
                 />
               ) : (
                 <Image
@@ -322,8 +286,7 @@ export default function Home() {
                   fill
                   className="object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
                   priority
-                  onLoad={() => markImageLoaded(selectedArtwork)}
-                  onError={() => markImageError(selectedArtwork)}
+                  onError={() => advanceImageFallback(selectedArtwork)}
                 />
               )}
             </div>
@@ -422,45 +385,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Debug panel de imágenes */}
-      <div className="fixed bottom-4 right-4 z-[70] w-[min(95vw,420px)]">
-        <div className="mb-2 flex justify-end">
-          <button
-            onClick={() => setShowDebugPanel((v) => !v)}
-            className="rounded-md border border-zinc-700 bg-zinc-900/95 px-3 py-1 text-[11px] uppercase tracking-wider text-zinc-200"
-          >
-            {showDebugPanel ? "Ocultar debug" : "Mostrar debug"}
-          </button>
-        </div>
-
-        {showDebugPanel && (
-          <div className="max-h-[45vh] overflow-auto rounded-lg border border-zinc-700 bg-black/95 p-3 text-[11px] text-zinc-200 shadow-2xl">
-            <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-zinc-400">Debug de carga de imágenes</p>
-            <p className="mb-3 text-zinc-500">Si una obra falla, acá vas a ver URL activa, intentos y motivo.</p>
-
-            <div className="space-y-3">
-              {artworks.map((artwork) => {
-                const debug = imageDebugById[artwork.id];
-                const activeUrl = resolveImageUrl(artwork);
-
-                return (
-                  <div key={`debug-${artwork.id}`} className="rounded border border-zinc-800 p-2">
-                    <p className="font-semibold text-zinc-100">{artwork.title}</p>
-                    <p className="mt-1 text-zinc-400">id: {artwork.id}</p>
-                    <p className="text-zinc-400">provider: {artwork.provider || "(sin provider)"}</p>
-                    <p className="text-zinc-400">driveFileId: {artwork.driveFileId || "(sin driveFileId)"}</p>
-                    <p className="mt-1 text-zinc-300 break-all">url activa: {debug?.activeUrl || activeUrl}</p>
-                    <p className="text-zinc-300">estado: {debug?.status || "idle"} | intentos: {debug?.attempts || 0}</p>
-                    {debug?.lastError && (
-                      <p className="mt-1 text-rose-300">error: {debug.lastError}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
     </main>
   );
 }
