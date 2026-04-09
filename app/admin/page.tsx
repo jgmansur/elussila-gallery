@@ -25,7 +25,6 @@ export default function AdminPage() {
   const [dimensions, setDimensions] = useState("");
   const [collections, setCollections] = useState<string[]>([]);
   const [collectionDraft, setCollectionDraft] = useState("");
-  const [selectedExistingCollection, setSelectedExistingCollection] = useState("");
   const [file, setFile] = useState<File | null>(null);
   
   const [uploading, setUploading] = useState(false);
@@ -44,7 +43,6 @@ export default function AdminPage() {
   const [editFeatured, setEditFeatured] = useState(false);
   const [editCollections, setEditCollections] = useState<string[]>([]);
   const [editCollectionDraft, setEditCollectionDraft] = useState("");
-  const [editSelectedExistingCollection, setEditSelectedExistingCollection] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
@@ -375,14 +373,12 @@ export default function AdminPage() {
 
   const addExistingCollection = (
     value: string,
-    setter: React.Dispatch<React.SetStateAction<string[]>>,
-    selectedSetter: React.Dispatch<React.SetStateAction<string>>
+    setter: React.Dispatch<React.SetStateAction<string[]>>
   ) => {
     const next = value.trim();
     if (!next) return;
 
     setter((prev) => parseCollections([...prev, next]));
-    selectedSetter("");
   };
 
   const availableCollections = Array.from(
@@ -480,7 +476,6 @@ export default function AdminPage() {
       setFeatured(false);
       setCollections([]);
       setCollectionDraft("");
-      setSelectedExistingCollection("");
       setFile(null);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
@@ -532,7 +527,6 @@ export default function AdminPage() {
     setEditFeatured(Boolean(artwork.featured));
     setEditCollections(parseCollections(artwork.collections));
     setEditCollectionDraft("");
-    setEditSelectedExistingCollection("");
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -829,29 +823,24 @@ export default function AdminPage() {
                         </button>
                       </div>
 
-                      {remainingNewCollections.length > 0 && (
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
-                          <select
-                            value={selectedExistingCollection}
-                            onChange={(e) => setSelectedExistingCollection(e.target.value)}
-                            className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white"
-                          >
-                            <option value="">Agregar colección existente…</option>
-                            {remainingNewCollections.map((name) => (
-                              <option key={name} value={name}>
-                                {name}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => addExistingCollection(selectedExistingCollection, setCollections, setSelectedExistingCollection)}
-                            className="rounded-xl border border-zinc-700 px-4 text-xs uppercase tracking-widest text-zinc-300"
-                          >
-                            Usar existente
-                          </button>
-                        </div>
-                      )}
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          addExistingCollection(e.target.value, setCollections);
+                          e.currentTarget.value = "";
+                        }}
+                        disabled={remainingNewCollections.length === 0}
+                        className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white disabled:text-zinc-600"
+                      >
+                        <option value="">
+                          {remainingNewCollections.length === 0 ? "No hay colecciones disponibles" : "Agregar colección existente…"}
+                        </option>
+                        {remainingNewCollections.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
 
                     </div>
                   </div>
@@ -1193,29 +1182,24 @@ export default function AdminPage() {
                   </button>
                 </div>
 
-                {remainingEditCollections.length > 0 && (
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
-                    <select
-                      value={editSelectedExistingCollection}
-                      onChange={(e) => setEditSelectedExistingCollection(e.target.value)}
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
-                    >
-                      <option value="">Agregar colección existente…</option>
-                      {remainingEditCollections.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => addExistingCollection(editSelectedExistingCollection, setEditCollections, setEditSelectedExistingCollection)}
-                      className="rounded-xl border border-zinc-700 px-4 text-xs uppercase tracking-widest text-zinc-300"
-                    >
-                      Usar existente
-                    </button>
-                  </div>
-                )}
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    addExistingCollection(e.target.value, setEditCollections);
+                    e.currentTarget.value = "";
+                  }}
+                  disabled={remainingEditCollections.length === 0}
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white disabled:text-zinc-600"
+                >
+                  <option value="">
+                    {remainingEditCollections.length === 0 ? "No hay colecciones disponibles" : "Agregar colección existente…"}
+                  </option>
+                  {remainingEditCollections.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
 
               </div>
 
