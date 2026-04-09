@@ -884,8 +884,8 @@ export default function AdminPage() {
       </div>
 
       {editingArtwork && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeEditModal}>
-          <div className="w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4" onClick={closeEditModal}>
+          <div className="mx-auto my-6 w-full max-w-2xl rounded-3xl border border-zinc-800 bg-zinc-950 p-6 max-h-[calc(100vh-3rem)] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h3 className="mb-6 text-2xl font-bold text-white">Editar obra</h3>
 
             <div className="space-y-4">
