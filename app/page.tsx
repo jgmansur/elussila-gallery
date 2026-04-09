@@ -173,7 +173,7 @@ export default function Home() {
 
     const message = messageByAction[action];
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/5491136531320?text=${encodedMessage}`, "_blank");
+    window.open(`https://wa.me/528343537539?text=${encodedMessage}`, "_blank");
   };
 
   const formatPrice = (price: any) => {

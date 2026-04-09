@@ -14,5 +14,5 @@ export const defaultSiteContent: SiteContent = {
   bioImageUrl: "/images/bio/elussila-retrato-al-oleo.jpg",
   contactEmail: "contacto@elussila.art",
   contactInstagram: "elussila",
-  contactWhatsapp: "5491136531320",
+  contactWhatsapp: "528343537539",
 };
