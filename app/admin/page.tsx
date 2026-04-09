@@ -44,6 +44,7 @@ export default function AdminPage() {
   const [editFeatured, setEditFeatured] = useState(false);
   const [editCollections, setEditCollections] = useState<string[]>([]);
   const [editCollectionDraft, setEditCollectionDraft] = useState("");
+  const [editRemovedGalleryIndexes, setEditRemovedGalleryIndexes] = useState<number[]>([]);
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editAdditionalFiles, setEditAdditionalFiles] = useState<File[]>([]);
@@ -281,6 +282,7 @@ export default function AdminPage() {
 
   const closeEditModal = () => {
     setEditingArtwork(null);
+    setEditRemovedGalleryIndexes([]);
     resetEditImageState();
     clearCropperState();
   };
@@ -606,6 +608,27 @@ export default function AdminPage() {
     }
   };
 
+  const getEditingGalleryItems = (artwork: any) => {
+    if (!artwork) return [] as Array<{ url: string; driveFileId: string; index: number }>;
+
+    let urls = parseStringArray(artwork.galleryUrls);
+    let driveIds = parseStringArray(artwork.galleryDriveFileIds);
+
+    if (urls.length === 0 && artwork.url) {
+      urls = [String(artwork.url)];
+    }
+    if (driveIds.length === 0 && artwork.driveFileId) {
+      driveIds = [String(artwork.driveFileId)];
+    }
+
+    const length = Math.max(urls.length, driveIds.length);
+    return Array.from({ length }).map((_, index) => ({
+      index,
+      url: urls[index] || (driveIds[index] ? `https://lh3.googleusercontent.com/d/${driveIds[index]}=w1200` : ""),
+      driveFileId: driveIds[index] || "",
+    }));
+  };
+
   const openEditModal = (artwork: any) => {
     setEditingArtwork(artwork);
     setEditTitle(artwork.title || "");
@@ -616,6 +639,7 @@ export default function AdminPage() {
     setEditFeatured(Boolean(artwork.featured));
     setEditCollections(parseCollections(artwork.collections));
     setEditCollectionDraft("");
+    setEditRemovedGalleryIndexes([]);
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -629,14 +653,30 @@ export default function AdminPage() {
 
     setSavingEdit(true);
     try {
-      let nextGalleryUrls = parseStringArray(editingArtwork.galleryUrls);
-      let nextGalleryDriveFileIds = parseStringArray(editingArtwork.galleryDriveFileIds);
+      let existingGalleryUrls = parseStringArray(editingArtwork.galleryUrls);
+      let existingGalleryDriveIds = parseStringArray(editingArtwork.galleryDriveFileIds);
 
-      if (nextGalleryUrls.length === 0 && editingArtwork.url) {
-        nextGalleryUrls = [String(editingArtwork.url)];
+      if (existingGalleryUrls.length === 0 && editingArtwork.url) {
+        existingGalleryUrls = [String(editingArtwork.url)];
       }
-      if (nextGalleryDriveFileIds.length === 0 && editingArtwork.driveFileId) {
-        nextGalleryDriveFileIds = [String(editingArtwork.driveFileId)];
+      if (existingGalleryDriveIds.length === 0 && editingArtwork.driveFileId) {
+        existingGalleryDriveIds = [String(editingArtwork.driveFileId)];
+      }
+
+      const driveIdsToDeleteAfterSave = new Set<string>();
+
+      const baseLength = Math.max(existingGalleryUrls.length, existingGalleryDriveIds.length);
+      const removedIndexSet = new Set(editRemovedGalleryIndexes);
+      let nextGalleryUrls = Array.from({ length: baseLength })
+        .map((_, idx) => existingGalleryUrls[idx] || "")
+        .filter((_, idx) => !removedIndexSet.has(idx));
+      let nextGalleryDriveFileIds = Array.from({ length: baseLength })
+        .map((_, idx) => existingGalleryDriveIds[idx] || "")
+        .filter((_, idx) => !removedIndexSet.has(idx));
+
+      for (const idx of removedIndexSet) {
+        const id = existingGalleryDriveIds[idx];
+        if (id) driveIdsToDeleteAfterSave.add(id);
       }
 
       const updates: Record<string, any> = {
@@ -657,6 +697,11 @@ export default function AdminPage() {
         const token = await getDriveAccessToken();
         const uploaded = await uploadImageToDrive(editImageFile, token);
 
+        const previousMainDriveId = nextGalleryDriveFileIds[0] || String(editingArtwork.driveFileId || "");
+        if (previousMainDriveId) {
+          driveIdsToDeleteAfterSave.add(previousMainDriveId);
+        }
+
         const tailUrls = nextGalleryUrls.length > 0 ? nextGalleryUrls.slice(1) : [];
         const tailDriveIds = nextGalleryDriveFileIds.length > 0 ? nextGalleryDriveFileIds.slice(1) : [];
         nextGalleryUrls = [uploaded.url, ...tailUrls];
@@ -675,6 +720,9 @@ export default function AdminPage() {
         updates.provider = deleteField();
         updates.width = deleteField();
         updates.height = deleteField();
+        for (const id of existingGalleryDriveIds) {
+          if (id) driveIdsToDeleteAfterSave.add(id);
+        }
         nextGalleryUrls = [];
         nextGalleryDriveFileIds = [];
       }
@@ -688,24 +736,35 @@ export default function AdminPage() {
         }
       }
 
+      nextGalleryUrls = nextGalleryUrls.filter(Boolean);
+      nextGalleryDriveFileIds = nextGalleryDriveFileIds.filter(Boolean);
+
+      if (nextGalleryUrls.length > 0) {
+        updates.url = nextGalleryUrls[0];
+      } else {
+        updates.url = "";
+      }
+
+      if (nextGalleryDriveFileIds.length > 0) {
+        updates.driveFileId = nextGalleryDriveFileIds[0];
+        updates.provider = "drive";
+      } else {
+        updates.driveFileId = deleteField();
+        updates.provider = deleteField();
+      }
+
       updates.galleryUrls = nextGalleryUrls;
       updates.galleryDriveFileIds = nextGalleryDriveFileIds;
 
       await updateDoc(doc(db, "artworks", editingArtwork.id), updates);
 
-      if (editImageFile || removeCurrentImage) {
+      if (driveIdsToDeleteAfterSave.size > 0 || (removeCurrentImage && editingArtwork.storagePath)) {
         try {
-          if (removeCurrentImage) {
-            const idsToDelete = new Set<string>([
-              ...parseStringArray(editingArtwork.galleryDriveFileIds),
-              String(editingArtwork.driveFileId || "").trim(),
-            ].filter(Boolean));
-            for (const id of idsToDelete) {
-              await deleteImageFromDrive(id);
-            }
-          } else if (editImageFile && editingArtwork.driveFileId) {
-            await deleteImageFromDrive(String(editingArtwork.driveFileId));
-          } else if (editingArtwork.storagePath) {
+          for (const id of driveIdsToDeleteAfterSave) {
+            await deleteImageFromDrive(id);
+          }
+
+          if (removeCurrentImage && editingArtwork.storagePath) {
             const previousFileRef = ref(storage, editingArtwork.storagePath);
             await deleteObject(previousFileRef);
           }
@@ -1394,6 +1453,64 @@ export default function AdminPage() {
                 <option value="reserved">Reservada</option>
                 <option value="sold">Vendida</option>
               </select>
+
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-widest text-zinc-400">Fotos guardadas</p>
+                  {getEditingGalleryItems(editingArtwork).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allIndexes = getEditingGalleryItems(editingArtwork).map((item) => item.index);
+                        setEditRemovedGalleryIndexes((prev) => (prev.length === allIndexes.length ? [] : allIndexes));
+                      }}
+                      className="text-[10px] uppercase tracking-widest text-red-300"
+                    >
+                      {editRemovedGalleryIndexes.length === getEditingGalleryItems(editingArtwork).length ? "Restaurar todas" : "Marcar todas para borrar"}
+                    </button>
+                  )}
+                </div>
+
+                {getEditingGalleryItems(editingArtwork).length === 0 ? (
+                  <p className="text-xs text-zinc-500">No hay fotos guardadas en esta obra.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {getEditingGalleryItems(editingArtwork).map((photo) => {
+                      const marked = editRemovedGalleryIndexes.includes(photo.index);
+
+                      return (
+                        <div key={`existing-photo-${photo.index}`} className="space-y-2">
+                          <div className={`relative overflow-hidden rounded-xl border ${marked ? "border-red-400/40 opacity-50" : "border-zinc-800"}`}>
+                            {photo.url ? (
+                              <img src={photo.url} alt={`Foto ${photo.index + 1}`} className="h-28 w-full object-cover" />
+                            ) : (
+                              <div className="flex h-28 items-center justify-center bg-zinc-950 text-[10px] text-zinc-600">Sin URL</div>
+                            )}
+                            <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-1 text-[10px] text-white">#{photo.index + 1}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditRemovedGalleryIndexes((prev) => (
+                                prev.includes(photo.index)
+                                  ? prev.filter((idx) => idx !== photo.index)
+                                  : [...prev, photo.index]
+                              ));
+                            }}
+                            className={`w-full rounded-lg border px-2 py-1 text-[10px] uppercase tracking-widest ${marked ? "border-zinc-700 text-zinc-300" : "border-red-400/30 text-red-300"}`}
+                          >
+                            {marked ? "Restaurar" : "Borrar"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {editRemovedGalleryIndexes.length > 0 && (
+                  <p className="text-xs text-amber-300">Se eliminarán {editRemovedGalleryIndexes.length} foto(s) al guardar.</p>
+                )}
+              </div>
 
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
                 <p className="text-xs uppercase tracking-widest text-zinc-400">Fotos adicionales</p>
