@@ -7,6 +7,7 @@ import { ref } from "firebase/storage";
 import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, deleteField } from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { deleteObject } from "firebase/storage";
+import ImageCropperDialog from "./image-cropper-dialog";
 
 // Lista de emails autorizados (Podés mover esto a Firestore después)
 const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com"]; 
@@ -36,6 +37,11 @@ export default function AdminPage() {
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
   const [removeCurrentImage, setRemoveCurrentImage] = useState(false);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperTarget, setCropperTarget] = useState<"new" | "edit">("new");
+  const [cropperImageSrc, setCropperImageSrc] = useState<string | null>(null);
+  const [cropperOriginalFile, setCropperOriginalFile] = useState<File | null>(null);
+  const [cropperFileName, setCropperFileName] = useState("imagen");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchCategory, setSearchCategory] = useState("all");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -184,25 +190,75 @@ export default function AdminPage() {
     setRemoveCurrentImage(false);
   };
 
-  const closeEditModal = () => {
-    setEditingArtwork(null);
-    resetEditImageState();
+  const clearCropperState = () => {
+    if (cropperImageSrc) {
+      URL.revokeObjectURL(cropperImageSrc);
+    }
+    setCropperOpen(false);
+    setCropperImageSrc(null);
+    setCropperOriginalFile(null);
+    setCropperFileName("imagen");
   };
 
-  const handleEditImageSelection = (selectedFile: File | null) => {
+  const applyFileToTarget = (selectedFile: File, target: "new" | "edit") => {
+    if (target === "new") {
+      setFile(selectedFile);
+      return;
+    }
+
     if (editImagePreviewUrl) {
       URL.revokeObjectURL(editImagePreviewUrl);
     }
+    setEditImageFile(selectedFile);
+    setEditImagePreviewUrl(URL.createObjectURL(selectedFile));
+    setRemoveCurrentImage(false);
+  };
 
+  const openCropperForFile = (selectedFile: File, target: "new" | "edit") => {
+    if (!selectedFile.type.startsWith("image/")) {
+      alert("Seleccioná un archivo de imagen válido.");
+      return;
+    }
+
+    if (cropperImageSrc) {
+      URL.revokeObjectURL(cropperImageSrc);
+    }
+
+    setCropperTarget(target);
+    setCropperOriginalFile(selectedFile);
+    setCropperFileName(selectedFile.name || "imagen");
+    setCropperImageSrc(URL.createObjectURL(selectedFile));
+    setCropperOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setEditingArtwork(null);
+    resetEditImageState();
+    clearCropperState();
+  };
+
+  const handleEditImageSelection = (selectedFile: File | null) => {
     if (!selectedFile) {
       setEditImageFile(null);
+      if (editImagePreviewUrl) {
+        URL.revokeObjectURL(editImagePreviewUrl);
+      }
       setEditImagePreviewUrl(null);
       return;
     }
 
-    setEditImageFile(selectedFile);
-    setEditImagePreviewUrl(URL.createObjectURL(selectedFile));
-    setRemoveCurrentImage(false);
+    openCropperForFile(selectedFile, "edit");
+  };
+
+  const handleCropApply = (croppedFile: File) => {
+    applyFileToTarget(croppedFile, cropperTarget);
+    clearCropperState();
+  };
+
+  const handleCropUseOriginal = () => {
+    if (!cropperOriginalFile) return;
+    applyFileToTarget(cropperOriginalFile, cropperTarget);
+    clearCropperState();
   };
 
   useEffect(() => {
@@ -233,8 +289,11 @@ export default function AdminPage() {
       if (editImagePreviewUrl) {
         URL.revokeObjectURL(editImagePreviewUrl);
       }
+      if (cropperImageSrc) {
+        URL.revokeObjectURL(cropperImageSrc);
+      }
     };
-  }, [editImagePreviewUrl]);
+  }, [cropperImageSrc, editImagePreviewUrl]);
 
   const handleLogin = async () => {
     try {
@@ -594,7 +653,13 @@ export default function AdminPage() {
                 <input 
                   type="file" 
                   ref={fileInputRef} 
-                  onChange={(e) => e.target.files && setFile(e.target.files[0])}
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0];
+                    if (selected) {
+                      openCropperForFile(selected, "new");
+                    }
+                    e.currentTarget.value = "";
+                  }}
                   className="hidden" 
                   accept="image/*"
                 />
@@ -859,7 +924,10 @@ export default function AdminPage() {
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => handleEditImageSelection(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    handleEditImageSelection(e.target.files?.[0] || null);
+                    e.currentTarget.value = "";
+                  }}
                 />
 
                 {editImageFile && (
@@ -889,6 +957,16 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      <ImageCropperDialog
+        open={cropperOpen}
+        imageSrc={cropperImageSrc}
+        fileName={cropperFileName}
+        title={cropperTarget === "new" ? "Recortar imagen para nueva obra" : "Recortar imagen para edición"}
+        onCancel={clearCropperState}
+        onUseOriginal={handleCropUseOriginal}
+        onApply={handleCropApply}
+      />
     </div>
   );
 }
