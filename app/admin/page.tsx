@@ -59,6 +59,7 @@ export default function AdminPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const additionalFilesInputRef = useRef<HTMLInputElement>(null);
+  const selectedMainFileRef = useRef<File | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const editAdditionalFilesInputRef = useRef<HTMLInputElement>(null);
   const category = "Pintura";
@@ -223,6 +224,7 @@ export default function AdminPage() {
   const applyFileToTarget = (selectedFile: File, target: "new" | "edit") => {
     if (target === "new") {
       setFile(selectedFile);
+      selectedMainFileRef.current = selectedFile;
       return;
     }
 
@@ -243,6 +245,7 @@ export default function AdminPage() {
     // Fallback: si el cropper no se usa/cierra, igual queda archivo seleccionado
     if (target === "new") {
       setFile(selectedFile);
+      selectedMainFileRef.current = selectedFile;
     } else {
       if (editImagePreviewUrl) {
         URL.revokeObjectURL(editImagePreviewUrl);
@@ -484,7 +487,8 @@ export default function AdminPage() {
 
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return alert("Selecciona una foto primero.");
+    const primaryFile = file || selectedMainFileRef.current || additionalFiles[0] || null;
+    if (!primaryFile) return alert("Selecciona una foto primero.");
     if (!title || !price) return alert("Título y Precio son obligatorios.");
 
     const generatedItemId = getNextItemId(category);
@@ -493,11 +497,11 @@ export default function AdminPage() {
     setProgress(0);
 
     try {
-      const { width, height } = await getImageDimensions(file);
+      const { width, height } = await getImageDimensions(primaryFile);
       const token = await getDriveAccessToken();
       setProgress(15);
 
-      const uploaded = await uploadImageToDrive(file, token);
+      const uploaded = await uploadImageToDrive(primaryFile, token);
       setProgress(75);
 
       const galleryUrls: string[] = [uploaded.url];
@@ -541,6 +545,7 @@ export default function AdminPage() {
       setCollections([]);
       setCollectionDraft("");
       setFile(null);
+      selectedMainFileRef.current = null;
       setAdditionalFiles([]);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
@@ -1027,7 +1032,11 @@ export default function AdminPage() {
                     <p className="text-zinc-500 text-xs uppercase tracking-widest">Listo para publicar</p>
                     <button 
                       type="button" 
-                      onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFile(null);
+                        selectedMainFileRef.current = null;
+                      }}
                       className="mt-4 text-xs text-red-400 hover:text-red-300 transition-colors"
                     >
                       Remover archivo

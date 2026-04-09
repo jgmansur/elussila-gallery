@@ -106,7 +106,7 @@ export default function ImageCropperDialog({
   if (!open || !imageSrc) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-4" onClick={onCancel}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-4">
       <div className="w-full max-w-4xl rounded-3xl border border-zinc-800 bg-zinc-950 p-5 md:p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-xl font-bold text-white">{title}</h3>
