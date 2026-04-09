@@ -105,7 +105,8 @@ export default function AdminPage() {
 
     return {
       fileId,
-      url: `https://drive.google.com/uc?export=view&id=${fileId}`,
+      // Evita links de preview inestables de Drive en render público
+      url: `https://drive.google.com/thumbnail?id=${fileId}&sz=w2000`,
     };
   };
 

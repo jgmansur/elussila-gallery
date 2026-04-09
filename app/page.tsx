@@ -11,10 +11,12 @@ type Artwork = {
   width: number;
   height: number;
   title: string;
-  price: string;
+  price: string | number;
   description: string;
   category: string;
   status: "available" | "reserved" | "sold";
+  provider?: "drive" | "firebase" | string;
+  driveFileId?: string;
 };
 
 export default function Home() {
@@ -41,6 +43,8 @@ export default function Home() {
           description: data.description || "",
           category: data.category || "Pintura",
           status: data.status || "available",
+          provider: data.provider,
+          driveFileId: data.driveFileId,
         } as Artwork;
       });
       setArtworks(fetchedArtworks);
@@ -75,6 +79,14 @@ export default function Home() {
   const filteredArtworks = selectedCategory === "Todas" 
     ? artworks 
     : artworks.filter(a => a.category === selectedCategory);
+
+  const resolveImageUrl = (artwork: Artwork) => {
+    if (artwork.provider === "drive" && artwork.driveFileId) {
+      // URL más estable para render público en galerías
+      return `https://drive.google.com/thumbnail?id=${artwork.driveFileId}&sz=w2000`;
+    }
+    return artwork.url;
+  };
 
   return (
     <main className="min-h-screen bg-[#050505] text-zinc-300 font-sans selection:bg-zinc-800 selection:text-white">
@@ -131,8 +143,9 @@ export default function Home() {
         ) : (
           filteredArtworks.map((artwork) => {
             const paddingPercentage = (artwork.height / artwork.width) * 100;
-             const isSold = artwork.status === "sold";
-             const isReserved = artwork.status === "reserved";
+            const isSold = artwork.status === "sold";
+            const isReserved = artwork.status === "reserved";
+            const imageUrl = resolveImageUrl(artwork);
 
             return (
               <div
@@ -144,14 +157,23 @@ export default function Home() {
                   className="relative w-full"
                   style={{ paddingBottom: `${paddingPercentage}%` }}
                 >
-                  <Image
-                    src={artwork.url}
-                    alt={artwork.title}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    className={`object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
-                    loading="lazy"
-                  />
+                  {artwork.provider === "drive" ? (
+                    <img
+                      src={imageUrl}
+                      alt={artwork.title}
+                      className={`absolute inset-0 h-full w-full object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <Image
+                      src={imageUrl}
+                      alt={artwork.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      className={`object-cover transition-all duration-1000 ease-out group-hover:scale-105 group-hover:brightness-110 ${isSold ? "grayscale opacity-60" : ""}`}
+                      loading="lazy"
+                    />
+                  )}
                   
                   {/* Item Overlay */}
                   <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-75">
@@ -212,13 +234,22 @@ export default function Home() {
           >
             {/* Image Viewer Section */}
             <div className="flex-1 relative overflow-hidden bg-black flex items-center justify-center group/viewer">
-              <Image
-                src={selectedArtwork.url}
-                alt={selectedArtwork.title}
-                fill
-                className="object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
-                priority
-              />
+              {selectedArtwork.provider === "drive" ? (
+                <img
+                  src={resolveImageUrl(selectedArtwork)}
+                  alt={selectedArtwork.title}
+                  className="h-full w-full object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
+                  loading="eager"
+                />
+              ) : (
+                <Image
+                  src={resolveImageUrl(selectedArtwork)}
+                  alt={selectedArtwork.title}
+                  fill
+                  className="object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
+                  priority
+                />
+              )}
             </div>
 
             {/* Info Section */}
