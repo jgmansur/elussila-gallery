@@ -266,16 +266,16 @@ export default function Home() {
 
           {/* Panel content */}
           <div 
-            className="h-full w-full max-w-7xl flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700"
+            className="h-full w-full max-w-[96vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image Viewer Section */}
-            <div className="flex-1 relative overflow-hidden bg-black flex items-center justify-center group/viewer">
+            <div className="relative overflow-hidden bg-black flex items-center justify-center group/viewer md:flex-[1.65]">
               {selectedArtwork.provider === "drive" ? (
                 <img
                   src={resolveImageUrl(selectedArtwork)}
                   alt={selectedArtwork.title}
-                  className="h-full w-full object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
+                  className="h-full w-full object-contain p-3 md:p-6 lg:p-8 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
                   loading="eager"
                   onError={() => advanceImageFallback(selectedArtwork)}
                 />
@@ -284,7 +284,7 @@ export default function Home() {
                   src={resolveImageUrl(selectedArtwork)}
                   alt={selectedArtwork.title}
                   fill
-                  className="object-contain p-8 md:p-16 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
+                  className="object-contain p-3 md:p-6 lg:p-8 transition-transform duration-1000 group-hover/viewer:scale-[1.02]"
                   priority
                   onError={() => advanceImageFallback(selectedArtwork)}
                 />
@@ -292,7 +292,7 @@ export default function Home() {
             </div>
 
             {/* Info Section */}
-            <div className="w-full md:w-[450px] p-8 md:p-16 flex flex-col justify-center bg-[#0a0a0a] border-l border-zinc-900 shadow-2xl">
+            <div className="w-full md:w-[390px] p-8 md:p-12 flex flex-col justify-center bg-[#0a0a0a] border-l border-zinc-900 shadow-2xl">
               <div className="space-y-12">
                 <header className="space-y-4">
                   <p className="text-[10px] uppercase tracking-[0.3em] font-semibold text-zinc-500">

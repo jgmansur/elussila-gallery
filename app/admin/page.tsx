@@ -26,6 +26,7 @@ export default function AdminPage() {
   const [progress, setProgress] = useState(0);
   const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
   const [artworks, setArtworks] = useState<any[]>([]);
+  const [imageFallbackById, setImageFallbackById] = useState<Record<string, { currentIndex: number; exhausted: boolean }>>({});
   const [editingArtwork, setEditingArtwork] = useState<any | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editPrice, setEditPrice] = useState("");
@@ -122,6 +123,49 @@ export default function AdminPage() {
     if (!response.ok && response.status !== 404) {
       throw new Error(`Drive delete failed: ${await response.text()}`);
     }
+  };
+
+  const resolveImageCandidates = (artwork: any) => {
+    if (artwork?.provider === "drive" && artwork?.driveFileId) {
+      return [
+        `https://lh3.googleusercontent.com/d/${artwork.driveFileId}=w1200`,
+        `https://drive.google.com/thumbnail?id=${artwork.driveFileId}&sz=w1200`,
+        `https://drive.google.com/uc?export=view&id=${artwork.driveFileId}`,
+      ];
+    }
+
+    if (artwork?.url) {
+      return [artwork.url];
+    }
+
+    return [];
+  };
+
+  const resolveArtworkImageUrl = (artwork: any) => {
+    const state = imageFallbackById[artwork.id];
+    if (state?.exhausted) return "";
+
+    const candidates = resolveImageCandidates(artwork);
+    const idx = state?.currentIndex ?? 0;
+    return candidates[idx] ?? candidates[0] ?? "";
+  };
+
+  const handleArtworkImageError = (artwork: any) => {
+    const candidates = resolveImageCandidates(artwork);
+
+    setImageFallbackById((prev) => {
+      const current = prev[artwork.id] ?? { currentIndex: 0, exhausted: false };
+      const nextIndex = current.currentIndex + 1;
+      const hasFallback = nextIndex < candidates.length;
+
+      return {
+        ...prev,
+        [artwork.id]: {
+          currentIndex: hasFallback ? nextIndex : current.currentIndex,
+          exhausted: !hasFallback,
+        },
+      };
+    });
   };
 
   useEffect(() => {
@@ -469,14 +513,24 @@ export default function AdminPage() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {artworks.map((art) => (
-                <div key={art.id} className="bg-zinc-900/40 border border-zinc-800 rounded-3xl overflow-hidden flex flex-col group">
+              {artworks.map((art) => {
+                const imageUrl = resolveArtworkImageUrl(art);
+
+                return (
+                  <div key={art.id} className="bg-zinc-900/40 border border-zinc-800 rounded-3xl overflow-hidden flex flex-col group">
                   <div className="relative aspect-square overflow-hidden bg-black">
-                    <img 
-                      src={art.url} 
-                      alt={art.title} 
-                      className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${art.status === 'sold' ? 'grayscale opacity-50' : ''}`}
-                    />
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={art.title}
+                        onError={() => handleArtworkImageError(art)}
+                        className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${art.status === 'sold' ? 'grayscale opacity-50' : ''}`}
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-zinc-950 text-zinc-500 text-xs uppercase tracking-wider">
+                        Imagen no disponible
+                      </div>
+                    )}
                     <div className="absolute top-4 left-4">
                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
                          art.status === 'available'
@@ -484,12 +538,12 @@ export default function AdminPage() {
                            : art.status === 'reserved'
                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
                              : 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-                       }`}>
+                        }`}>
                          {art.status === 'available' ? 'Disponible' : art.status === 'reserved' ? 'Reservada' : 'Vendida'}
                        </span>
-                     </div>
-                   </div>
-                  
+                      </div>
+                    </div>
+                   
                   <div className="p-6 flex flex-col flex-1">
                     <div className="mb-4">
                       <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">{art.category}</p>
@@ -542,8 +596,9 @@ export default function AdminPage() {
                        </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
               
               {artworks.length === 0 && (
                 <div className="col-span-full py-20 bg-zinc-900/20 border-2 border-dashed border-zinc-800 rounded-[2.5rem] text-center">
