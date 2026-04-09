@@ -14,6 +14,8 @@ type Artwork = {
   price: string | number;
   description: string;
   category: string;
+  itemId?: string;
+  location?: string;
   status: "available" | "reserved" | "sold";
   provider?: "drive" | "firebase" | string;
   driveFileId?: string;
@@ -48,6 +50,8 @@ export default function Home() {
           price: data.price || "",
           description: data.description || "",
           category: data.category || "Pintura",
+          itemId: data.itemId || "",
+          location: data.location || "",
           status: data.status || "available",
           provider: data.provider,
           driveFileId: data.driveFileId,
@@ -61,10 +65,11 @@ export default function Home() {
   }, []);
 
   const openWhatsApp = (artwork: Artwork, action: "reserve" | "purchase" | "waitlist" = "reserve") => {
+    const reference = artwork.itemId ? ` (ID: ${artwork.itemId})` : "";
     const messageByAction = {
-      reserve: `Hola Elussila! Me gustaría reservar o consultar por la pieza "${artwork.title}". ¿Sigue disponible?`,
-      purchase: `Hola Elussila! Quiero comprar la pieza "${artwork.title}". ¿Me compartís los pasos para pago y envío?`,
-      waitlist: `Hola Elussila! Vi que la pieza "${artwork.title}" está reservada. ¿Puedo quedar en lista de espera?`,
+      reserve: `Hola Elussila! Me gustaría reservar o consultar por la pieza "${artwork.title}"${reference}. ¿Sigue disponible?`,
+      purchase: `Hola Elussila! Quiero comprar la pieza "${artwork.title}"${reference}. ¿Me compartís los pasos para pago y envío?`,
+      waitlist: `Hola Elussila! Vi que la pieza "${artwork.title}"${reference} está reservada. ¿Puedo quedar en lista de espera?`,
     };
 
     const message = messageByAction[action];
@@ -301,6 +306,9 @@ export default function Home() {
                   <h2 className="font-serif text-4xl md:text-5xl font-thin text-white tracking-tight leading-tight">
                     {selectedArtwork.title}
                   </h2>
+                  {selectedArtwork.itemId && (
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-400">ID item: {selectedArtwork.itemId}</p>
+                  )}
                 </header>
 
                 <div className="space-y-6">

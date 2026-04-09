@@ -21,6 +21,8 @@ export default function AdminPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [itemId, setItemId] = useState("");
+  const [location, setLocation] = useState("");
   const [file, setFile] = useState<File | null>(null);
   
   const [uploading, setUploading] = useState(false);
@@ -33,6 +35,8 @@ export default function AdminPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editItemId, setEditItemId] = useState("");
+  const [editLocation, setEditLocation] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
@@ -318,10 +322,22 @@ export default function AdminPage() {
     });
   };
 
+  const isItemIdTaken = (rawItemId: string, excludeArtworkId?: string) => {
+    const normalized = rawItemId.trim().toLowerCase();
+    if (!normalized) return false;
+
+    return artworks.some((art) => {
+      if (excludeArtworkId && art.id === excludeArtworkId) return false;
+      return String(art.itemId || "").trim().toLowerCase() === normalized;
+    });
+  };
+
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return alert("Selecciona una foto primero.");
     if (!title || !price) return alert("Título y Precio son obligatorios.");
+    if (!itemId.trim()) return alert("El ID item es obligatorio para publicar.");
+    if (isItemIdTaken(itemId)) return alert("Ese ID item ya existe. Usá uno único.");
 
     setUploading(true);
     setProgress(0);
@@ -338,6 +354,8 @@ export default function AdminPage() {
         title,
         price: Number(price),
         description,
+        itemId: itemId.trim(),
+        location: location.trim(),
         category,
         url: uploaded.url,
         driveFileId: uploaded.fileId,
@@ -352,6 +370,8 @@ export default function AdminPage() {
       setTitle("");
       setPrice("");
       setDescription("");
+      setItemId("");
+      setLocation("");
       setFile(null);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
@@ -398,6 +418,8 @@ export default function AdminPage() {
     setEditTitle(artwork.title || "");
     setEditPrice(String(artwork.price ?? ""));
     setEditDescription(artwork.description || "");
+    setEditItemId(artwork.itemId || "");
+    setEditLocation(artwork.location || "");
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -406,6 +428,8 @@ export default function AdminPage() {
     if (!editingArtwork) return;
     if (!editTitle.trim()) return alert("El título es obligatorio.");
     if (!editPrice || Number(editPrice) <= 0) return alert("El precio debe ser mayor a 0.");
+    if (!editItemId.trim()) return alert("El ID item es obligatorio.");
+    if (isItemIdTaken(editItemId, editingArtwork.id)) return alert("Ese ID item ya existe. Usá uno único.");
 
     setSavingEdit(true);
     try {
@@ -413,6 +437,8 @@ export default function AdminPage() {
         title: editTitle.trim(),
         price: Number(editPrice),
         description: editDescription,
+        itemId: editItemId.trim(),
+        location: editLocation.trim(),
         status: editStatus,
         category: "Pintura",
       };
@@ -479,10 +505,12 @@ export default function AdminPage() {
     const priceText = String(art.price ?? "").toLowerCase();
     const statusText = String(art.status || "").toLowerCase();
     const idText = String(art.id || "").toLowerCase();
+    const itemIdText = String(art.itemId || "").toLowerCase();
+    const locationText = String(art.location || "").toLowerCase();
     const providerText = String(art.provider || "").toLowerCase();
     const driveIdText = String(art.driveFileId || "").toLowerCase();
 
-    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, providerText, driveIdText].join(" ");
+    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, providerText, driveIdText].join(" ");
 
     const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
     const matchesCategory = searchCategory === "all" || categoryText === searchCategory.toLowerCase();
@@ -599,7 +627,30 @@ export default function AdminPage() {
                        Pintura
                      </div>
                    </div>
-                 </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">ID item (visible al cliente)</label>
+                      <input
+                        type="text"
+                        value={itemId}
+                        onChange={(e) => setItemId(e.target.value)}
+                        placeholder="Ej. ELU-001"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Ubicación (solo admin)</label>
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        placeholder="Ej. Bodega A / Estante 3"
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors"
+                      />
+                    </div>
+                  </div>
 
                 <div>
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Descripción</label>
@@ -694,7 +745,7 @@ export default function AdminPage() {
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por nombre, descripción, precio, estado, id, provider..."
+                  placeholder="Buscar por nombre, ID item, descripción, ubicación, precio, estado..."
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
                 />
                 <select
@@ -742,7 +793,9 @@ export default function AdminPage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] uppercase tracking-widest text-zinc-500">{art.category}</p>
                         <p className="truncate text-lg font-bold text-white">{art.title}</p>
+                        <p className="text-[11px] uppercase tracking-widest text-zinc-500">ID item: {art.itemId || "(sin ID)"}</p>
                         <p className="text-sm font-mono text-zinc-400">${art.price}</p>
+                        <p className="truncate text-xs text-zinc-500">Ubicación: {art.location || "(sin ubicación)"}</p>
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -856,6 +909,21 @@ export default function AdminPage() {
                 placeholder="Descripción"
                 className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
               />
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <input
+                  value={editItemId}
+                  onChange={(e) => setEditItemId(e.target.value)}
+                  placeholder="ID item"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+                />
+                <input
+                  value={editLocation}
+                  onChange={(e) => setEditLocation(e.target.value)}
+                  placeholder="Ubicación (solo admin)"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+                />
+              </div>
 
               <select
                 value={editStatus}
