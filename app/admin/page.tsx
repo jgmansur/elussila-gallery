@@ -853,18 +853,6 @@ export default function AdminPage() {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-2">
-                        {remainingNewCollections.slice(0, 8).map((name) => (
-                          <button
-                            key={`quick-new-${name}`}
-                            type="button"
-                            onClick={() => addExistingCollection(name, setCollections, setSelectedExistingCollection)}
-                            className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-200"
-                          >
-                            + {name}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
 
@@ -1229,18 +1217,6 @@ export default function AdminPage() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2">
-                  {remainingEditCollections.slice(0, 8).map((name) => (
-                    <button
-                      key={`quick-edit-${name}`}
-                      type="button"
-                      onClick={() => addExistingCollection(name, setEditCollections, setEditSelectedExistingCollection)}
-                      className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-200"
-                    >
-                      + {name}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <select
