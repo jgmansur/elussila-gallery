@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
+import "react-easy-crop/react-easy-crop.css";
 
 type ImageCropperDialogProps = {
   open: boolean;
