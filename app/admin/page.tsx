@@ -240,6 +240,18 @@ export default function AdminPage() {
       return;
     }
 
+    // Fallback: si el cropper no se usa/cierra, igual queda archivo seleccionado
+    if (target === "new") {
+      setFile(selectedFile);
+    } else {
+      if (editImagePreviewUrl) {
+        URL.revokeObjectURL(editImagePreviewUrl);
+      }
+      setEditImageFile(selectedFile);
+      setEditImagePreviewUrl(URL.createObjectURL(selectedFile));
+      setRemoveCurrentImage(false);
+    }
+
     if (cropperImageSrc) {
       URL.revokeObjectURL(cropperImageSrc);
     }
