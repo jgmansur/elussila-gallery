@@ -568,7 +568,6 @@ export default function AdminPage() {
         <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-20">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border border-emerald-500/20">Admin Active</span>
               <h1 className="text-4xl font-bold tracking-tighter">ELUSSILA STUDIO</h1>
             </div>
             <p className="text-zinc-500 text-lg">Gestioná tu obra, biografía y ventas desde aquí.</p>
