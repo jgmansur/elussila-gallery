@@ -63,6 +63,7 @@ export default function AdminPage() {
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const editAdditionalFilesInputRef = useRef<HTMLInputElement>(null);
   const category = "Pintura";
+  const publishMainFile = file || selectedMainFileRef.current;
 
   const createDriveProvider = () => {
     const provider = new GoogleAuthProvider();
@@ -247,7 +248,9 @@ export default function AdminPage() {
   };
 
   const openCropperForFile = (selectedFile: File, target: "new" | "edit") => {
-    if (!selectedFile.type.startsWith("image/")) {
+    const isImageByType = selectedFile.type?.startsWith("image/");
+    const isImageByName = /\.(jpg|jpeg|png|webp|gif|bmp|heic|heif)$/i.test(selectedFile.name || "");
+    if (!isImageByType && !isImageByName) {
       alert("Seleccioná un archivo de imagen válido.");
       return;
     }
@@ -1025,7 +1028,7 @@ export default function AdminPage() {
                 onClick={() => !uploading && fileInputRef.current?.click()}
                 className={`group relative border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer ${
                   uploading ? "border-zinc-800 bg-zinc-900 pointer-events-none" : "border-zinc-800 hover:border-zinc-600 bg-zinc-950 hover:bg-zinc-900"
-                } ${file ? "border-emerald-500/50" : ""}`}
+                } ${publishMainFile ? "border-emerald-500/50" : ""}`}
               >
                 {uploading ? (
                   <div className="text-center p-8">
@@ -1033,19 +1036,19 @@ export default function AdminPage() {
                     <p className="font-bold text-xl">{Math.round(progress)}%</p>
                     <p className="text-zinc-500 text-sm">Subiendo a Google Drive...</p>
                   </div>
-                ) : file ? (
+                ) : publishMainFile ? (
                   <div className="text-center p-8">
                     <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     </div>
-                    <p className="font-bold text-lg mb-1 truncate max-w-[200px] mx-auto">{file.name}</p>
+                    <p className="font-bold text-lg mb-1 truncate max-w-[200px] mx-auto">{publishMainFile.name}</p>
                     <p className="text-zinc-500 text-xs uppercase tracking-widest">Listo para publicar</p>
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (file) {
-                          openCropperForFile(file, "new");
+                        if (publishMainFile) {
+                          openCropperForFile(publishMainFile, "new");
                         }
                       }}
                       className="mt-3 text-xs text-zinc-300 hover:text-white transition-colors"

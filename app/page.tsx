@@ -631,7 +631,7 @@ export default function Home() {
 
           {/* Panel content */}
           <div 
-            className="h-full w-full max-w-[99vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700 overflow-hidden"
+            className="h-full w-full max-w-[99vw] flex flex-col md:flex-row bg-[#080808] animate-in slide-in-from-right duration-700 overflow-y-auto md:overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image Viewer Section */}
@@ -675,7 +675,7 @@ export default function Home() {
               />
 
               {selectedArtworkImages.length > 1 && (
-                <div className="absolute bottom-3 left-0 right-0 z-20 px-3">
+                <div className="absolute bottom-3 left-0 right-0 z-20 px-3 hidden md:block">
                   <div className="mx-auto flex max-w-full gap-2 overflow-x-auto rounded-full bg-black/40 p-2">
                     {selectedArtworkImages.map((imageUrl, index) => (
                       <button
@@ -695,8 +695,28 @@ export default function Home() {
               )}
             </div>
 
+            {selectedArtworkImages.length > 1 && (
+              <div className="md:hidden border-t border-zinc-900 bg-black/90 px-3 py-2">
+                <div className="flex gap-2 overflow-x-auto">
+                  {selectedArtworkImages.map((imageUrl, index) => (
+                    <button
+                      key={`${selectedArtwork.id}-thumb-mobile-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedImageIndex(index);
+                        setSelectedImageFallbackIndex(0);
+                      }}
+                      className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-md border ${selectedImageIndex === index ? "border-white" : "border-zinc-700"}`}
+                    >
+                      <img src={imageUrl} alt={`Miniatura móvil ${index + 1}`} className="h-full w-full object-cover" loading="lazy" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Info Section */}
-            <div className="w-full h-[34vh] min-h-[230px] overflow-y-auto md:h-full md:min-h-0 md:w-[340px] p-6 md:p-10 flex flex-col justify-start md:justify-center bg-[#0a0a0a] border-t md:border-t-0 border-l-0 md:border-l border-zinc-900 shadow-2xl">
+            <div className="w-full min-h-[230px] md:h-full md:min-h-0 md:w-[340px] p-6 md:p-10 flex flex-col justify-start md:justify-center bg-[#0a0a0a] border-t md:border-t-0 border-l-0 md:border-l border-zinc-900 shadow-2xl">
               <div className="space-y-12">
                 <header className="space-y-4">
                   <p className="text-[10px] uppercase tracking-[0.3em] font-semibold text-zinc-500">
