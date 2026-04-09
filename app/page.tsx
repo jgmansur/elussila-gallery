@@ -18,6 +18,7 @@ type Artwork = {
   location?: string;
   dimensions?: string;
   collections?: string[];
+  featured?: boolean;
   status: "available" | "reserved" | "sold";
   provider?: "drive" | "firebase" | string;
   driveFileId?: string;
@@ -28,16 +29,42 @@ type ImageFallbackState = {
   attempts: number;
 };
 
+const CATEGORY_OPTIONS = ["Todas", "Pintura"] as const;
+
+const getInitialRouteFilters = () => {
+  if (typeof window === "undefined") {
+    return {
+      category: "Todas",
+      view: "artworks" as "artworks" | "collections",
+      query: "",
+      collection: "all",
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const category = params.get("category");
+  const view = params.get("view");
+
+  return {
+    category: category && CATEGORY_OPTIONS.includes(category as (typeof CATEGORY_OPTIONS)[number]) ? category : "Todas",
+    view: view === "collections" ? "collections" : "artworks",
+    query: params.get("q") || "",
+    collection: params.get("collection") || "all",
+  };
+};
+
 export default function Home() {
+  const initialFilters = getInitialRouteFilters();
   const [artworks, setArtworks] = useState<Artwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState("Todas");
-  const [pinturaView, setPinturaView] = useState<"artworks" | "collections">("artworks");
-  const [clientSearch, setClientSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(initialFilters.category);
+  const [pinturaView, setPinturaView] = useState<"artworks" | "collections">(initialFilters.view);
+  const [clientSearch, setClientSearch] = useState(initialFilters.query);
+  const [selectedCollection, setSelectedCollection] = useState(initialFilters.collection);
   const [imageFallbackById, setImageFallbackById] = useState<Record<string, ImageFallbackState>>({});
 
-  const categories = ["Todas", "Pintura"];
+  const categories = [...CATEGORY_OPTIONS];
 
   const parseCollections = (value: unknown): string[] => {
     const values = Array.isArray(value)
@@ -63,6 +90,15 @@ export default function Home() {
     return normalized;
   };
 
+  const shuffleArtworks = (items: Artwork[]) => {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+
   useEffect(() => {
     // Escuchar cambios en la colección 'artworks'
     const q = query(collection(db, "artworks"), orderBy("createdAt", "desc"));
@@ -82,12 +118,16 @@ export default function Home() {
           location: data.location || "",
           dimensions: data.dimensions || "",
           collections: parseCollections(data.collections),
+          featured: Boolean(data.featured),
           status: data.status || "available",
           provider: data.provider,
           driveFileId: data.driveFileId,
         } as Artwork;
       });
-      setArtworks(fetchedArtworks);
+
+      const featured = fetchedArtworks.filter((artwork) => artwork.featured);
+      const regular = fetchedArtworks.filter((artwork) => !artwork.featured);
+      setArtworks([...shuffleArtworks(featured), ...shuffleArtworks(regular)]);
       setLoading(false);
     });
 
@@ -149,9 +189,39 @@ export default function Home() {
     }
   }
   const collectionGroups = Array.from(collectionsMap.entries()).sort(([a], [b]) => a.localeCompare(b, "es"));
+  const activeCollectionFilter = selectedCollection === "all"
+    ? "all"
+    : collectionGroups.some(([name]) => name.toLowerCase() === selectedCollection.toLowerCase())
+      ? selectedCollection
+      : "all";
+  const visibleCollectionGroups = activeCollectionFilter === "all"
+    ? collectionGroups
+    : collectionGroups.filter(([name]) => name.toLowerCase() === activeCollectionFilter.toLowerCase());
 
   const isCollectionsView = selectedCategory === "Pintura" && pinturaView === "collections";
   const artworksToRender = isCollectionsView ? artworksWithCollections : searchFilteredArtworks;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams();
+    params.set("category", selectedCategory);
+
+    if (selectedCategory === "Pintura") {
+      params.set("view", pinturaView);
+      if (pinturaView === "collections" && activeCollectionFilter !== "all") {
+        params.set("collection", activeCollectionFilter);
+      }
+    }
+
+    if (clientSearch.trim()) {
+      params.set("q", clientSearch.trim());
+    }
+
+    const nextQuery = params.toString();
+    const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [activeCollectionFilter, clientSearch, pinturaView, selectedCategory]);
 
   const resolveImageCandidates = (artwork: Artwork) => {
     if (artwork.provider === "drive" && artwork.driveFileId) {
@@ -226,6 +296,12 @@ export default function Home() {
             />
           )}
 
+          {artwork.featured && (
+            <span className="absolute top-3 left-3 rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-amber-200">
+              Featured
+            </span>
+          )}
+
           <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-500 delay-75">
             <div className="space-y-1">
               <p className="text-[10px] uppercase tracking-[0.2em] font-semibold text-zinc-400">
@@ -281,6 +357,7 @@ export default function Home() {
                 setSelectedCategory(cat);
                 if (cat !== "Pintura") {
                   setPinturaView("artworks");
+                  setSelectedCollection("all");
                 }
               }}
               className={`px-5 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-all duration-300 rounded-full border ${
@@ -297,7 +374,10 @@ export default function Home() {
         {selectedCategory === "Pintura" && (
           <div className="flex justify-center gap-2">
             <button
-              onClick={() => setPinturaView("artworks")}
+              onClick={() => {
+                setPinturaView("artworks");
+                setSelectedCollection("all");
+              }}
               className={`px-4 py-1 text-[10px] uppercase tracking-[0.22em] rounded-full border transition-all ${
                 pinturaView === "artworks"
                   ? "bg-zinc-100 text-black border-zinc-100"
@@ -346,14 +426,63 @@ export default function Home() {
         </section>
       ) : isCollectionsView ? (
         <section className="px-4 sm:px-8 pb-24 mx-auto max-w-[1600px] space-y-12">
-          {collectionGroups.length === 0 ? (
+          {collectionGroups.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setSelectedCollection("all")}
+                className={`px-3 py-1 rounded-full border text-[10px] uppercase tracking-[0.2em] ${
+                  activeCollectionFilter === "all"
+                    ? "bg-zinc-100 text-black border-zinc-100"
+                    : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                Todas
+              </button>
+              {collectionGroups.map(([collectionName]) => (
+                <button
+                  key={`filter-${collectionName}`}
+                  onClick={() => setSelectedCollection(collectionName)}
+                  className={`px-3 py-1 rounded-full border text-[10px] uppercase tracking-[0.2em] ${
+                    activeCollectionFilter.toLowerCase() === collectionName.toLowerCase()
+                      ? "bg-zinc-100 text-black border-zinc-100"
+                      : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {collectionName}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {visibleCollectionGroups.length === 0 ? (
             <div className="py-32 text-center text-zinc-600 font-light">
               No hay obras asignadas a colecciones para esta búsqueda.
             </div>
           ) : (
-            collectionGroups.map(([collectionName, groupArtworks]) => (
+            visibleCollectionGroups.map(([collectionName, groupArtworks]) => (
               <div key={collectionName} className="space-y-4">
-                <h3 className="px-1 text-xs uppercase tracking-[0.25em] text-zinc-400">{collectionName}</h3>
+                <div className="flex items-center justify-between gap-3 px-1">
+                  <h3 className="text-xs uppercase tracking-[0.25em] text-zinc-400">{collectionName}</h3>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const params = new URLSearchParams(window.location.search);
+                      params.set("category", "Pintura");
+                      params.set("view", "collections");
+                      params.set("collection", collectionName);
+                      const shareUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+                      try {
+                        await navigator.clipboard.writeText(shareUrl);
+                        alert("Link de colección copiado.");
+                      } catch {
+                        alert(`Copiá este link: ${shareUrl}`);
+                      }
+                    }}
+                    className="rounded-full border border-zinc-700 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-zinc-400 hover:text-zinc-200"
+                  >
+                    Copiar link
+                  </button>
+                </div>
                 <div className="masonry-grid">
                   {groupArtworks.map((artwork) => renderArtworkCard(artwork, `${collectionName}-${artwork.id}`))}
                 </div>

@@ -21,11 +21,11 @@ export default function AdminPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [itemId, setItemId] = useState("");
   const [location, setLocation] = useState("");
   const [dimensions, setDimensions] = useState("");
   const [collections, setCollections] = useState<string[]>([]);
   const [collectionDraft, setCollectionDraft] = useState("");
+  const [selectedExistingCollection, setSelectedExistingCollection] = useState("");
   const [file, setFile] = useState<File | null>(null);
   
   const [uploading, setUploading] = useState(false);
@@ -38,11 +38,13 @@ export default function AdminPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editItemId, setEditItemId] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editDimensions, setEditDimensions] = useState("");
+  const [featured, setFeatured] = useState(false);
+  const [editFeatured, setEditFeatured] = useState(false);
   const [editCollections, setEditCollections] = useState<string[]>([]);
   const [editCollectionDraft, setEditCollectionDraft] = useState("");
+  const [editSelectedExistingCollection, setEditSelectedExistingCollection] = useState("");
   const [editStatus, setEditStatus] = useState<"available" | "reserved" | "sold">("available");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState<string | null>(null);
@@ -371,28 +373,73 @@ export default function AdminPage() {
     setter((prev) => prev.filter((item) => item.toLowerCase() !== value.toLowerCase()));
   };
 
+  const addExistingCollection = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    selectedSetter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const next = value.trim();
+    if (!next) return;
+
+    setter((prev) => parseCollections([...prev, next]));
+    selectedSetter("");
+  };
+
   const availableCollections = Array.from(
     new Set(
       artworks.flatMap((art) => parseCollections(art.collections))
     )
   ).sort((a, b) => a.localeCompare(b, "es"));
 
-  const isItemIdTaken = (rawItemId: string, excludeArtworkId?: string) => {
-    const normalized = rawItemId.trim().toLowerCase();
-    if (!normalized) return false;
+  const remainingNewCollections = availableCollections.filter(
+    (name) => !collections.some((current) => current.toLowerCase() === name.toLowerCase())
+  );
 
-    return artworks.some((art) => {
-      if (excludeArtworkId && art.id === excludeArtworkId) return false;
-      return String(art.itemId || "").trim().toLowerCase() === normalized;
-    });
+  const remainingEditCollections = availableCollections.filter(
+    (name) => !editCollections.some((current) => current.toLowerCase() === name.toLowerCase())
+  );
+
+  const normalizeCategory = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase();
+
+  const getPrefixForCategory = (value: string) => {
+    const normalized = normalizeCategory(value);
+    if (normalized.includes("joyeria")) return "JOYE";
+    return "PINT";
   };
+
+  const getNextItemId = (categoryValue: string, excludeArtworkId?: string) => {
+    const prefix = getPrefixForCategory(categoryValue);
+    const pattern = new RegExp(`^${prefix}\\s*-\\s*(\\d{4})$`, "i");
+
+    let max = 0;
+    for (const art of artworks) {
+      if (excludeArtworkId && art.id === excludeArtworkId) continue;
+      const raw = String(art.itemId || "").trim();
+      const match = raw.match(pattern);
+      if (!match) continue;
+
+      const sequence = Number(match[1]);
+      if (!Number.isNaN(sequence) && sequence > max) {
+        max = sequence;
+      }
+    }
+
+    return `${prefix} - ${String(max + 1).padStart(4, "0")}`;
+  };
+
+  const nextItemIdForNew = getNextItemId(category);
 
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return alert("Selecciona una foto primero.");
     if (!title || !price) return alert("Título y Precio son obligatorios.");
-    if (!itemId.trim()) return alert("El ID item es obligatorio para publicar.");
-    if (isItemIdTaken(itemId)) return alert("Ese ID item ya existe. Usá uno único.");
+
+    const generatedItemId = getNextItemId(category);
 
     setUploading(true);
     setProgress(0);
@@ -409,9 +456,10 @@ export default function AdminPage() {
         title,
         price: Number(price),
         description,
-        itemId: itemId.trim(),
+        itemId: generatedItemId,
         location: location.trim(),
         dimensions: dimensions.trim(),
+        featured,
         collections: parseCollections(collections),
         category,
         url: uploaded.url,
@@ -427,11 +475,12 @@ export default function AdminPage() {
       setTitle("");
       setPrice("");
       setDescription("");
-      setItemId("");
       setLocation("");
       setDimensions("");
+      setFeatured(false);
       setCollections([]);
       setCollectionDraft("");
+      setSelectedExistingCollection("");
       setFile(null);
       alert("¡Obra publicada exitosamente en Google Drive!");
     } catch (e) {
@@ -478,11 +527,12 @@ export default function AdminPage() {
     setEditTitle(artwork.title || "");
     setEditPrice(String(artwork.price ?? ""));
     setEditDescription(artwork.description || "");
-    setEditItemId(artwork.itemId || "");
     setEditLocation(artwork.location || "");
     setEditDimensions(artwork.dimensions || "");
+    setEditFeatured(Boolean(artwork.featured));
     setEditCollections(parseCollections(artwork.collections));
     setEditCollectionDraft("");
+    setEditSelectedExistingCollection("");
     setEditStatus((artwork.status || "available") as "available" | "reserved" | "sold");
     resetEditImageState();
   };
@@ -491,8 +541,8 @@ export default function AdminPage() {
     if (!editingArtwork) return;
     if (!editTitle.trim()) return alert("El título es obligatorio.");
     if (!editPrice || Number(editPrice) <= 0) return alert("El precio debe ser mayor a 0.");
-    if (!editItemId.trim()) return alert("El ID item es obligatorio.");
-    if (isItemIdTaken(editItemId, editingArtwork.id)) return alert("Ese ID item ya existe. Usá uno único.");
+
+    const resolvedItemId = String(editingArtwork.itemId || "").trim() || getNextItemId(editingArtwork.category || category, editingArtwork.id);
 
     setSavingEdit(true);
     try {
@@ -500,9 +550,10 @@ export default function AdminPage() {
         title: editTitle.trim(),
         price: Number(editPrice),
         description: editDescription,
-        itemId: editItemId.trim(),
+        itemId: resolvedItemId,
         location: editLocation.trim(),
         dimensions: editDimensions.trim(),
+        featured: editFeatured,
         collections: parseCollections(editCollections),
         status: editStatus,
         category: "Pintura",
@@ -574,10 +625,11 @@ export default function AdminPage() {
     const locationText = String(art.location || "").toLowerCase();
     const dimensionsText = String(art.dimensions || "").toLowerCase();
     const collectionsText = parseCollections(art.collections).join(" ").toLowerCase();
+    const featuredText = art.featured ? "featured destacado" : "";
     const providerText = String(art.provider || "").toLowerCase();
     const driveIdText = String(art.driveFileId || "").toLowerCase();
 
-    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, dimensionsText, collectionsText, providerText, driveIdText].join(" ");
+    const searchable = [title, descriptionText, categoryText, priceText, statusText, idText, itemIdText, locationText, dimensionsText, collectionsText, featuredText, providerText, driveIdText].join(" ");
 
     const matchesQuery = !normalizedQuery || searchable.includes(normalizedQuery);
     const matchesCategory = searchCategory === "all" || categoryText === searchCategory.toLowerCase();
@@ -697,14 +749,10 @@ export default function AdminPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">ID item (visible al cliente)</label>
-                      <input
-                        type="text"
-                        value={itemId}
-                        onChange={(e) => setItemId(e.target.value)}
-                        placeholder="Ej. ELU-001"
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-white transition-colors"
-                      />
+                      <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">ID item (automático)</label>
+                      <div className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl p-4 text-zinc-200 font-mono">
+                        {nextItemIdForNew}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Ubicación (solo admin)</label>
@@ -717,6 +765,16 @@ export default function AdminPage() {
                       />
                     </div>
                   </div>
+
+                  <label className="flex items-center gap-3 text-sm text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={featured}
+                      onChange={(e) => setFeatured(e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-700 bg-zinc-900"
+                    />
+                    Marcar como featured (mostrar primero)
+                  </label>
 
                   <div>
                     <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Dimensiones</label>
@@ -759,7 +817,6 @@ export default function AdminPage() {
                               addCollectionTag(collectionDraft, setCollections, setCollectionDraft);
                             }
                           }}
-                          list="existing-collections"
                           placeholder="Escribí y presioná Enter (ej. Rostros)"
                           className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white"
                         />
@@ -771,11 +828,43 @@ export default function AdminPage() {
                           Agregar
                         </button>
                       </div>
-                      <datalist id="existing-collections">
-                        {availableCollections.map((name) => (
-                          <option key={name} value={name} />
+
+                      {remainingNewCollections.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                          <select
+                            value={selectedExistingCollection}
+                            onChange={(e) => setSelectedExistingCollection(e.target.value)}
+                            className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm text-white"
+                          >
+                            <option value="">Agregar colección existente…</option>
+                            {remainingNewCollections.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => addExistingCollection(selectedExistingCollection, setCollections, setSelectedExistingCollection)}
+                            className="rounded-xl border border-zinc-700 px-4 text-xs uppercase tracking-widest text-zinc-300"
+                          >
+                            Usar existente
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        {remainingNewCollections.slice(0, 8).map((name) => (
+                          <button
+                            key={`quick-new-${name}`}
+                            type="button"
+                            onClick={() => addExistingCollection(name, setCollections, setSelectedExistingCollection)}
+                            className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-200"
+                          >
+                            + {name}
+                          </button>
                         ))}
-                      </datalist>
+                      </div>
                     </div>
                   </div>
 
@@ -872,7 +961,7 @@ export default function AdminPage() {
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por nombre, ID item, descripción, ubicación, dimensiones, precio..."
+                  placeholder="Buscar por nombre, ID item, descripción, ubicación, dimensiones, colecciones..."
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-950 p-3 text-sm text-white"
                 />
                 <select
@@ -928,6 +1017,11 @@ export default function AdminPage() {
                       </div>
 
                       <div className="flex items-center gap-3">
+                        {art.featured && (
+                          <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border bg-amber-500/10 text-amber-300 border-amber-500/20">
+                            Featured
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md border ${
                           art.status === "available"
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
@@ -1040,12 +1134,12 @@ export default function AdminPage() {
               />
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <input
-                  value={editItemId}
-                  onChange={(e) => setEditItemId(e.target.value)}
-                  placeholder="ID item"
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
-                />
+                <div className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-zinc-200 text-sm">
+                  <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">ID item (automático)</p>
+                  <p className="font-mono">
+                    {String(editingArtwork.itemId || "").trim() || getNextItemId(editingArtwork.category || category, editingArtwork.id)}
+                  </p>
+                </div>
                 <input
                   value={editLocation}
                   onChange={(e) => setEditLocation(e.target.value)}
@@ -1059,6 +1153,16 @@ export default function AdminPage() {
                   className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
                 />
               </div>
+
+              <label className="flex items-center gap-3 text-sm text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={editFeatured}
+                  onChange={(e) => setEditFeatured(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-700 bg-zinc-900"
+                />
+                Featured (mostrar primero en el feed)
+              </label>
 
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
                 <p className="text-xs uppercase tracking-widest text-zinc-400">Colecciones (opcional)</p>
@@ -1089,7 +1193,6 @@ export default function AdminPage() {
                         addCollectionTag(editCollectionDraft, setEditCollections, setEditCollectionDraft);
                       }
                     }}
-                    list="existing-collections"
                     placeholder="Escribí y presioná Enter"
                     className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
                   />
@@ -1100,6 +1203,43 @@ export default function AdminPage() {
                   >
                     Agregar
                   </button>
+                </div>
+
+                {remainingEditCollections.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                    <select
+                      value={editSelectedExistingCollection}
+                      onChange={(e) => setEditSelectedExistingCollection(e.target.value)}
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-3 text-white"
+                    >
+                      <option value="">Agregar colección existente…</option>
+                      {remainingEditCollections.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => addExistingCollection(editSelectedExistingCollection, setEditCollections, setEditSelectedExistingCollection)}
+                      className="rounded-xl border border-zinc-700 px-4 text-xs uppercase tracking-widest text-zinc-300"
+                    >
+                      Usar existente
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {remainingEditCollections.slice(0, 8).map((name) => (
+                    <button
+                      key={`quick-edit-${name}`}
+                      type="button"
+                      onClick={() => addExistingCollection(name, setEditCollections, setEditSelectedExistingCollection)}
+                      className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-[10px] uppercase tracking-widest text-zinc-400 hover:text-zinc-200"
+                    >
+                      + {name}
+                    </button>
+                  ))}
                 </div>
               </div>
 
