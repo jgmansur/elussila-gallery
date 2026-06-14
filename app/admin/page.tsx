@@ -10,7 +10,10 @@ import { deleteObject } from "firebase/storage";
 import ImageCropperDialog from "./image-cropper-dialog";
 
 // Lista de emails autorizados (Podés mover esto a Firestore después)
-const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com", "xeronimo3@gmail.com"]; 
+const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com", "xeronimo3@gmail.com"];
+// Solo esta cuenta puede subir fotos (las imágenes se guardan en SU Google Drive).
+// El resto de admins puede editar todo lo demás, pero no subir/reemplazar imágenes.
+const PHOTO_UPLOADER_EMAIL = "jgmansur2@gmail.com"; 
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -74,7 +77,18 @@ export default function AdminPage() {
     return provider;
   };
 
+  const ensureCanUpload = (): boolean => {
+    if (user?.email !== PHOTO_UPLOADER_EMAIL) {
+      alert(`Solo ${PHOTO_UPLOADER_EMAIL} puede subir fotos. Podés editar todo lo demás; pedile a Jay que suba las imágenes.`);
+      return false;
+    }
+    return true;
+  };
+
   const getDriveAccessToken = async (): Promise<string> => {
+    if (auth.currentUser?.email !== PHOTO_UPLOADER_EMAIL) {
+      throw new Error(`Solo ${PHOTO_UPLOADER_EMAIL} puede subir fotos a Google Drive.`);
+    }
     if (driveAccessToken) return driveAccessToken;
     if (!auth.currentUser) {
       throw new Error("No hay usuario autenticado para Google Drive.");
@@ -1063,7 +1077,7 @@ export default function AdminPage() {
                   <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Fotos adicionales (opcional)</p>
                   <button
                     type="button"
-                    onClick={() => additionalFilesInputRef.current?.click()}
+                    onClick={() => { if (!ensureCanUpload()) return; additionalFilesInputRef.current?.click(); }}
                     className="rounded-xl border border-zinc-700 px-4 py-2 text-xs uppercase tracking-widest text-zinc-300"
                   >
                     Seleccionar fotos
@@ -1103,7 +1117,7 @@ export default function AdminPage() {
 
               {/* Upload Dropzone */}
               <div 
-                onClick={() => !uploading && fileInputRef.current?.click()}
+                onClick={() => { if (!ensureCanUpload()) return; if (!uploading) fileInputRef.current?.click(); }}
                 className={`group relative border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center transition-all cursor-pointer ${
                   uploading ? "border-zinc-800 bg-zinc-900 pointer-events-none" : "border-zinc-800 hover:border-zinc-600 bg-zinc-950 hover:bg-zinc-900"
                 } ${publishMainFile ? "border-emerald-500/50" : ""}`}
@@ -1552,7 +1566,7 @@ export default function AdminPage() {
                 <p className="text-xs uppercase tracking-widest text-zinc-400">Fotos adicionales</p>
                 <button
                   type="button"
-                  onClick={() => editAdditionalFilesInputRef.current?.click()}
+                  onClick={() => { if (!ensureCanUpload()) return; editAdditionalFilesInputRef.current?.click(); }}
                   className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
                 >
                   Agregar fotos al carrusel
@@ -1609,7 +1623,7 @@ export default function AdminPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => editFileInputRef.current?.click()}
+                    onClick={() => { if (!ensureCanUpload()) return; editFileInputRef.current?.click(); }}
                     className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
                   >
                     Subir nueva imagen
