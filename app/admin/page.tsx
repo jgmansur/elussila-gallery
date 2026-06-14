@@ -10,7 +10,7 @@ import { deleteObject } from "firebase/storage";
 import ImageCropperDialog from "./image-cropper-dialog";
 
 // Lista de emails autorizados (Podés mover esto a Firestore después)
-const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com"]; 
+const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com", "xeronimo3@gmail.com"]; 
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);

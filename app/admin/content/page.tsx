@@ -7,7 +7,7 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { defaultSiteContent } from "@/lib/site-content";
 
-const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com"];
+const ADMIN_EMAILS = ["elussila@gmail.com", "jgmansur2@gmail.com", "xeronimo3@gmail.com"];
 
 export default function AdminContentPage() {
   const [user, setUser] = useState<User | null>(null);
