@@ -24,7 +24,7 @@ export default function AdminContentPage() {
   useEffect(() => {
     const unsubApp = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setIsAuthorized(Boolean(u && (ADMIN_EMAILS.includes(u.email || "") || u.email?.includes("jaystudio"))));
+      setIsAuthorized(Boolean(u && ADMIN_EMAILS.includes(u.email || "")));
       setLoadingApp(false);
     });
 

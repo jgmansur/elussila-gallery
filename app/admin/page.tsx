@@ -339,7 +339,7 @@ export default function AdminPage() {
   useEffect(() => {
     const unsubApp = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (u && (ADMIN_EMAILS.includes(u.email || "") || u.email?.includes("jaystudio"))) {
+      if (u && ADMIN_EMAILS.includes(u.email || "")) {
         setIsAuthorized(true);
       } else {
         setIsAuthorized(false);
