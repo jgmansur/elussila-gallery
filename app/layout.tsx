@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "EluSSila | Fine Art Gallery",
     description: "Piezas únicas de arte físico y digital.",
-    url: "https://elussila.art",
+    url: "https://elussila.musicknobs.com",
     siteName: "EluSSila Gallery",
     locale: "es_AR",
     type: "website",
